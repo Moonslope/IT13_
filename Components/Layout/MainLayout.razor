@@ -89,14 +89,11 @@
                         </button>
                         <div class="sidebar-submenu @(ExpandedSection == "inventory" ? "open" : "")">
                             <button class="sidebar-subnav-item @(GetActiveClass("/inventory/dashboard"))" @onclick='() => NavigateTo("/inventory/dashboard")'>Inventory Dashboard</button>
+                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/stock-management"))" @onclick='() => NavigateTo("/inventory/stock-management")'>Inventory Items</button>
                             <button class="sidebar-subnav-item @(GetActiveClass("/inventory/suppliers"))" @onclick='() => NavigateTo("/inventory/suppliers")'>Suppliers</button>
                             <button class="sidebar-subnav-item @(GetActiveClass("/inventory/purchase-orders"))" @onclick='() => NavigateTo("/inventory/purchase-orders")'>Purchase Orders</button>
-                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/stock-management"))" @onclick='() => NavigateTo("/inventory/stock-management")'>Stock Management</button>
+                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/service-inventory"))" @onclick='() => NavigateTo("/inventory/service-inventory")'>Service Inventory Links</button>
                             <button class="sidebar-subnav-item @(GetActiveClass("/inventory/consumptions"))" @onclick='() => NavigateTo("/inventory/consumptions")'>Consumption History</button>
-                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/reports"))" @onclick='() => NavigateTo("/inventory/reports")'>Inventory Reports</button>
-                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/alerts"))" @onclick='() => NavigateTo("/inventory/alerts")'>Stock Alerts</button>
-                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/service-categories"))" @onclick='() => NavigateTo("/inventory/service-categories")'>Service Categories</button>
-                            <button class="sidebar-subnav-item @(GetActiveClass("/inventory/services"))" @onclick='() => NavigateTo("/inventory/services")'>Services</button>
                         </div>
                     </div>
                 }

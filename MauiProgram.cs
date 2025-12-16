@@ -36,7 +36,7 @@ namespace HestiaIT13Final
             builder.Services.AddScoped<HousekeepingService>();
 
             // Add database context with connection string
-            var connectionString = "Data Source=LAPTOP-E5NDCGBJ\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
+            var connectionString = "Data Source=MSI\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30";
             
             // Register DbContext for services that need scoped instances
             builder.Services.AddDbContext<HestiaLinkContext>(options =>

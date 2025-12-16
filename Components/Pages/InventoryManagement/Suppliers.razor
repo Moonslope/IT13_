@@ -1,73 +1,34 @@
 @page "/inventory/suppliers"
 @using Microsoft.EntityFrameworkCore
-@using HestiaLink.Models
-@using HestiaLink.Data
-@using HestiaLink.Services
-@inject HestiaLinkContext DbContext
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
 @inject InventoryService InventoryService
 @inject IJSRuntime JSRuntime
-@layout MainLayout
+@layout HestiaIT13Final.Components.Layout.MainLayout
 
 <div class="page-wrapper">
-    <div class="page-topbar">
+    <header class="page-topbar">
         <div>
             <h1>Suppliers</h1>
-            <div class="page-topbar-subtitle">Vendor Directory</div>
+            <span class="page-topbar-subtitle">Vendor Management</span>
         </div>
         <UserDropdown />
-    </div>
+    </header>
 
     <div class="page-content">
-        @* ===== SUMMARY CARDS ===== *@
-        @if (IsLoaded && !HasError)
-        {
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-label">TOTAL SUPPLIERS</div>
-                    <div class="summary-value">@SupplierList.Count(s => s.IsActive == true)</div>
-                    <div class="summary-desc">Active external partners</div>
-                </div>
-
-                <div class="summary-card">
-                    <div class="summary-label">ACTIVE ITEMS</div>
-                    <div class="summary-value">@TotalItemsLinked</div>
-                    <div class="summary-desc">Total catalog size</div>
-                </div>
-
-                <div class="summary-card">
-                    <div class="summary-label">TOTAL SPEND (YTD)</div>
-                    <div class="summary-value">₱@TotalSpendYTD.ToString("N0")</div>
-                    <div class="summary-desc">Lifetime expenditure</div>
-                </div>
-
-                <div class="summary-card">
-                    <div class="summary-label">CATEGORIES</div>
-                    <div class="summary-value">@SupplierList.Where(s => s.IsActive == true).Select(s => s.SupplierType).Distinct().Count()</div>
-                    <div class="summary-desc">Supplier categories</div>
-                </div>
-            </div>
-        }
         <div class="user-toolbar">
             <div class="toolbar-left">
                 <div class="toolbar-search">
-                    <input type="text" placeholder="Search suppliers..." @bind="SearchText" @oninput="OnSearchChanged" />
+                    <input type="text" placeholder="Search by name, code, or contact..." @bind="SearchText" @oninput="OnSearchChanged" />
                 </div>
-                <select class="filter-select" @bind="FilterType">
-                    <option value="">All Types</option>
-                    @foreach (var type in SupplierTypes)
-                    {
-                        <option value="@type">@type</option>
-                    }
-                </select>
                 <select class="filter-select" @bind="FilterStatus">
-                    <option value="Active">Active</option>
-                    <option value="All">All</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="All">All Suppliers</option>
+                    <option value="Active">Active Only</option>
+                    <option value="Inactive">Inactive Only</option>
                 </select>
             </div>
             <div>
-                <button class="btn-secondary" style="margin-right:10px;" @onclick="OpenInactiveModal">View Inactive (@InactiveCount)</button>
-                <button class="btn-create" @onclick="OpenCreateModal">New Supplier</button>
+                <button class="btn-create" @onclick="OpenModal">Create New Supplier</button>
             </div>
         </div>
 
@@ -78,9 +39,9 @@
         else if (HasError)
         {
             <div class="error-message">
-                <h4><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> Database Error</h4>
+                <h4>⚠️ Error</h4>
                 <p>@ErrorMessage</p>
-                <button class="btn-primary" @onclick="LoadData">Retry</button>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
             </div>
         }
         else
@@ -94,51 +55,65 @@
                                 <tr>
                                     <th>Supplier Code</th>
                                     <th>Supplier Name</th>
-                                    <th>Type</th>
                                     <th>Contact Person</th>
                                     <th>Phone</th>
                                     <th>Email</th>
-                                    <th>Items</th>
-                                    <th>Total Spend (YTD)</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
                                     <th style="text-align:center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var supplier in PagedSuppliers)
+                                @foreach (var supplier in PaginatedSuppliers)
                                 {
                                     <tr>
                                         <td style="font-family:monospace; font-weight:700;">@supplier.SupplierCode</td>
-                                        <td style="font-weight: 700; color: #102f33;">@supplier.SupplierName</td>
-                                        <td><span class="type-badge">@(supplier.SupplierType ?? "N/A")</span></td>
+                                        <td style="font-weight:600;">@supplier.SupplierName</td>
                                         <td>@(supplier.ContactPerson ?? "-")</td>
                                         <td>@(supplier.ContactPhone ?? "-")</td>
                                         <td>@(supplier.ContactEmail ?? "-")</td>
-                                        <td style="font-weight:600;">@(SupplierItemCounts.GetValueOrDefault(supplier.SupplierID, 0))</td>
-                                        <td style="color:#004f59; font-weight:700;">₱@(SupplierSpends.GetValueOrDefault(supplier.SupplierID, 0).ToString("N2"))</td>
+                                        <td>@(supplier.SupplierType ?? "-")</td>
+                                        <td>
+                                            @if ((supplier.IsActive ?? false))
+                                            {
+                                                <span class="badge-active">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-archived">Inactive</span>
+                                            }
+                                        </td>
                                         <td style="text-align:center;">
                                             <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
                                                 <button class="btn-icon-action edit" @onclick="() => OpenEditModal(supplier)" title="Edit">
                                                     <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                                                 </button>
-                                                <button class="btn-icon-action view" @onclick="() => OpenViewModal(supplier)" title="View Details">
-                                                    <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                                                </button>
-                                                <button class="btn-icon-action archive" @onclick="() => SetInactiveSupplier(supplier)" title="Set Inactive">
-                                                    <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44l.8-.97zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55z"/></svg>
-                                                </button>
+                                                @if (supplier.IsActive == true)
+                                                {
+                                                    <button class="btn-icon-action archive" @onclick="() => DeactivateSupplier(supplier)" title="Deactivate">
+                                                        <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44l.8-.97zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55z"/></svg>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn-icon-action edit" @onclick="() => ActivateSupplier(supplier)" title="Activate">
+                                                        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                                                    </button>
+                                                }
                                             </div>
                                         </td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
-
-                        <Pagination
-                            TotalItems="@FilteredSuppliers.Count"
-                            ItemsPerPage="@ItemsPerPage"
-                            CurrentPage="@Math.Clamp(CurrentPage, 1, TotalPages)"
-                            OnPageChanged="@HandlePageChanged"
-                            OnItemsPerPageChangedCallback="@HandleItemsPerPageChanged" />
+                        @if (FilteredSuppliers.Count > 0)
+                        {
+                            <Pagination CurrentPage="@CurrentPage" 
+                                        TotalItems="@FilteredSuppliers.Count" 
+                                        ItemsPerPage="@ItemsPerPage"
+                                        OnPageChanged="@OnPageChanged"
+                                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                        }
                     }
                     else
                     {
@@ -147,244 +122,82 @@
                 </div>
             </div>
         }
-        </div>
     </div>
+</div>
 
-@* ===== CREATE/EDIT MODAL ===== *@
 @if (ShowModal)
 {
     <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.4rem;">@(IsEditMode ? "Edit Supplier" : "New Supplier")</h2>
+                <h2 style="margin:0; font-size:1.4rem;">@(IsEditMode ? "Edit Supplier" : "Create New Supplier")</h2>
             </div>
 
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label">Supplier Code *</label>
-                    <input type="text" class="form-input" @bind="CurrentSupplier.SupplierCode" placeholder="e.g., SUP-001" @bind:event="oninput" disabled="@IsEditMode" />
+                    <input type="text" class="form-input" @bind="CurrentSupplier.SupplierCode" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Supplier Name *</label>
+                    <input type="text" class="form-input" @bind="CurrentSupplier.SupplierName" />
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Supplier Name *</label>
-                    <input type="text" class="form-input" @bind="CurrentSupplier.SupplierName" placeholder="Company name" />
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" class="form-input" @bind="CurrentSupplier.ContactPerson" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contact Phone</label>
+                    <input type="text" class="form-input" @bind="CurrentSupplier.ContactPhone" />
                 </div>
 
+                <div class="form-group">
+                    <label class="form-label">Contact Email</label>
+                    <input type="email" class="form-input" @bind="CurrentSupplier.ContactEmail" />
+                </div>
                 <div class="form-group">
                     <label class="form-label">Supplier Type</label>
                     <select class="form-select" @bind="CurrentSupplier.SupplierType">
-                        <option value="">Select Type</option>
+                        <option value="">-- Select Type --</option>
                         <option value="FOOD">Food</option>
                         <option value="BEVERAGE">Beverage</option>
                         <option value="AMENITIES">Amenities</option>
                         <option value="CLEANING">Cleaning</option>
                         <option value="LINEN">Linen</option>
-                        <option value="MAINTENANCE">Maintenance</option>
                         <option value="OTHER">Other</option>
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Contact Person</label>
-                    <input type="text" class="form-input" @bind="CurrentSupplier.ContactPerson" placeholder="Primary contact name" />
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Contact Phone</label>
-                    <input type="text" class="form-input" @bind="CurrentSupplier.ContactPhone" placeholder="+63 XXX XXX XXXX" />
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Contact Email</label>
-                    <input type="email" class="form-input" @bind="CurrentSupplier.ContactEmail" placeholder="email@company.com" />
-                </div>
-
                 <div class="form-group full-width">
                     <label class="form-label">Address</label>
-                    <textarea class="form-input" rows="2" @bind="CurrentSupplier.Address" placeholder="Full address"></textarea>
+                    <textarea class="form-input" @bind="CurrentSupplier.Address" rows="3"></textarea>
                 </div>
             </div>
 
-            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:20px;">
-                <button class="btn-primary" @onclick="SaveSupplier">@(IsEditMode ? "Update" : "Add Supplier")</button>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="SaveSupplier">@(IsEditMode ? "Update Supplier" : "Create Supplier")</button>
                 <button class="btn-secondary" @onclick="CloseModal">Cancel</button>
             </div>
         </div>
     </div>
 }
 
-@* ===== VIEW DETAILS MODAL ===== *@
-@if (ShowViewModal)
-{
-    <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.4rem;">Supplier Details</h2>
-            </div>
-
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <span class="detail-label">Code</span>
-                    <span class="detail-value" style="font-family:monospace;">@ViewSupplier?.SupplierCode</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Name</span>
-                    <span class="detail-value" style="font-weight:700;">@ViewSupplier?.SupplierName</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Type</span>
-                    <span class="detail-value">@(ViewSupplier?.SupplierType ?? "N/A")</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Contact Person</span>
-                    <span class="detail-value">@(ViewSupplier?.ContactPerson ?? "-")</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Phone</span>
-                    <span class="detail-value">@(ViewSupplier?.ContactPhone ?? "-")</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Email</span>
-                    <span class="detail-value">@(ViewSupplier?.ContactEmail ?? "-")</span>
-                </div>
-                <div class="detail-item full-width">
-                    <span class="detail-label">Address</span>
-                    <span class="detail-value">@(ViewSupplier?.Address ?? "-")</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Items Supplied</span>
-                    <span class="detail-value" style="font-weight:700; color:#0f766e;">@(ViewSupplier != null ? SupplierItemCounts.GetValueOrDefault(ViewSupplier.SupplierID, 0) : 0)</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Total Spend (YTD)</span>
-                    <span class="detail-value" style="font-weight:700; color:#0f766e;">₱@(ViewSupplier != null ? SupplierSpends.GetValueOrDefault(ViewSupplier.SupplierID, 0).ToString("N2") : "0.00")</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Status</span>
-                    <span class="detail-value">
-                        @if (ViewSupplier?.IsActive == true)
-                        {
-                            <span class="badge-active">Active</span>
-                        }
-                        else
-                        {
-                            <span class="badge-inactive">Inactive</span>
-                        }
-                    </span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Created</span>
-                    <span class="detail-value">@(ViewSupplier?.CreatedDate?.ToString("MM/dd/yyyy") ?? "-")</span>
-                </div>
-            </div>
-
-            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:20px;">
-                <button class="btn-primary" @onclick="() => { ShowViewModal = false; OpenEditModal(ViewSupplier!); }">Edit Supplier</button>
-                <button class="btn-secondary" @onclick="CloseViewModal">Close</button>
-            </div>
-        </div>
-    </div>
-}
-
-@* ===== INACTIVE SUPPLIERS MODAL ===== *@
-@if (ShowInactiveModal)
-{
-    <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.4rem;">Inactive Suppliers</h2>
-                <div style="font-size: 0.9rem; color: #94a3b8;">@InactiveSuppliers.Count inactive suppliers</div>
-            </div>
-
-            <div class="panel-body" style="max-height:60vh; overflow-y:auto;">
-                @if (InactiveSuppliers.Any())
-                {
-                    <table class="user-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th>Contact</th>
-                                <th style="text-align:center;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var supplier in InactiveSuppliers)
-                            {
-                                <tr>
-                                    <td style="font-family:monospace;">@supplier.SupplierCode</td>
-                                    <td style="font-weight:700;">@supplier.SupplierName</td>
-                                    <td>@(supplier.SupplierType ?? "N/A")</td>
-                                    <td>@(supplier.ContactPerson ?? "-")</td>
-                                    <td style="text-align:center;">
-                                        <button class="btn-secondary" style="background:#10b981;" @onclick="() => RestoreSupplier(supplier)">Activate</button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-                else
-                {
-                    <div class="no-data" style="padding:40px;">No inactive suppliers</div>
-                }
-            </div>
-
-            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
-                <button class="btn-secondary" @onclick="CloseInactiveModal">Close</button>
-            </div>
-        </div>
-    </div>
-}
-
-@* ===== CONFIRM SET INACTIVE MODAL ===== *@
-@if (ShowConfirmInactive)
-{
-    <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 420px;">
-            <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.2rem;">Confirm Set Inactive</h2>
-            </div>
-            <div style="padding: 20px;">
-                <p>Are you sure you want to set <strong>@InactiveTarget?.SupplierName</strong> to inactive?</p>
-                <p style="color: #f59e0b; font-size: 0.9rem;">Inactive suppliers can be activated later from the inactive list.</p>
-            </div>
-            <div class="action-footer" style="border:none; padding-bottom:0;">
-                <button type="button" class="btn-secondary" style="background:#f59e0b;" @onclick="ConfirmSetInactive">Set Inactive</button>
-                <button type="button" class="btn-secondary" @onclick="CancelSetInactive">Cancel</button>
-            </div>
-        </div>
-    </div>
-}
-
 @code {
-    // State
     private string SearchText = "";
-    private string FilterType = "";
     private string FilterStatus = "Active";
-    private int CurrentPage = 1;
-    private int ItemsPerPage = 10;
     private bool ShowModal = false;
-    private bool ShowViewModal = false;
-    private bool ShowInactiveModal = false;
-    private bool ShowConfirmInactive = false;
     private bool IsEditMode = false;
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
 
-    // Data
-    private Supplier CurrentSupplier = new();
-    private Supplier? ViewSupplier;
-    private Supplier? InactiveTarget;
-    private List<Supplier> SupplierList = new();
-    private Dictionary<int, int> SupplierItemCounts = new();
-    private Dictionary<int, decimal> SupplierSpends = new();
-    private int TotalItemsLinked = 0;
-    private decimal TotalSpendYTD = 0;
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
 
-    private List<string> SupplierTypes => new() { "FOOD", "BEVERAGE", "AMENITIES", "CLEANING", "LINEN", "MAINTENANCE", "OTHER" };
+    private Supplier CurrentSupplier = new();
+    private List<Supplier> SuppliersList = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -398,27 +211,12 @@
             HasError = false;
             ErrorMessage = string.Empty;
 
-            SupplierList = await DbContext.Suppliers
+            using var context = ContextFactory.CreateDbContext();
+            
+            SuppliersList = await context.Suppliers
                 .AsNoTracking()
                 .OrderBy(s => s.SupplierName)
                 .ToListAsync();
-
-            // Load item counts and spends
-            SupplierItemCounts.Clear();
-            SupplierSpends.Clear();
-
-            foreach (var supplier in SupplierList.Where(s => s.IsActive == true))
-            {
-                var itemCount = await InventoryService.GetSupplierItemCountAsync(supplier.SupplierID);
-                var spend = await InventoryService.GetSupplierTotalSpendAsync(supplier.SupplierID);
-                SupplierItemCounts[supplier.SupplierID] = itemCount;
-                SupplierSpends[supplier.SupplierID] = spend;
-            }
-
-            TotalItemsLinked = SupplierItemCounts.Values.Sum();
-            TotalSpendYTD = SupplierSpends.Values.Sum();
-
-            CurrentPage = 1;
 
             IsLoaded = true;
         }
@@ -426,89 +224,86 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
             IsLoaded = true;
         }
+    }
+
+    private async Task RetryLoad()
+    {
+        IsLoaded = false;
+        StateHasChanged();
+        await Task.Delay(500);
+        await LoadData();
     }
 
     private void OnSearchChanged(ChangeEventArgs e)
     {
         SearchText = e.Value?.ToString() ?? string.Empty;
         CurrentPage = 1;
+        StateHasChanged();
     }
 
     private List<Supplier> FilteredSuppliers
     {
         get
         {
-            var items = SupplierList.AsEnumerable();
+            var list = SuppliersList.ToList();
 
-            // Search filter
             if (!string.IsNullOrWhiteSpace(SearchText))
             {
-                var searchLower = SearchText.ToLowerInvariant();
-                items = items.Where(s =>
-                    s.SupplierName.ToLowerInvariant().Contains(searchLower) ||
-                    s.SupplierCode.ToLowerInvariant().Contains(searchLower) ||
-                    (s.ContactPerson != null && s.ContactPerson.ToLowerInvariant().Contains(searchLower)));
+                var search = SearchText.Trim();
+                list = list.Where(s =>
+                    s.SupplierCode.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    s.SupplierName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (s.ContactPerson ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (s.ContactEmail ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
             }
 
-            // Type filter
-            if (!string.IsNullOrEmpty(FilterType))
-            {
-                items = items.Where(s => s.SupplierType == FilterType);
-            }
-
-            // Status filter
             if (FilterStatus == "Active")
-                items = items.Where(s => s.IsActive == true);
+                list = list.Where(s => s.IsActive == true).ToList();
             else if (FilterStatus == "Inactive")
-                items = items.Where(s => s.IsActive != true);
+                list = list.Where(s => s.IsActive != true).ToList();
 
-            return items.OrderBy(s => s.SupplierName).ToList();
+            return list.OrderBy(s => s.SupplierName).ToList();
         }
     }
 
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredSuppliers.Count / (double)ItemsPerPage));
-
-    private IEnumerable<Supplier> PagedSuppliers
+    private List<Supplier> PaginatedSuppliers
     {
         get
         {
-            var safePage = Math.Clamp(CurrentPage, 1, TotalPages);
-            return FilteredSuppliers
-                .Skip((safePage - 1) * ItemsPerPage)
-                .Take(ItemsPerPage);
+            var filtered = FilteredSuppliers;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
         }
     }
 
-    private void HandlePageChanged(int page)
+    private void OnPageChanged(int page)
     {
-        CurrentPage = Math.Clamp(page, 1, TotalPages);
+        CurrentPage = page;
+        StateHasChanged();
     }
 
-    private void HandleItemsPerPageChanged(int size)
+    private void OnItemsPerPageChanged(int itemsPerPage)
     {
-        ItemsPerPage = size;
+        ItemsPerPage = itemsPerPage;
         CurrentPage = 1;
+        StateHasChanged();
     }
 
-    private List<Supplier> InactiveSuppliers => SupplierList.Where(s => s.IsActive != true).ToList();
-    private int InactiveCount => InactiveSuppliers.Count;
-
-    // Modal handlers
-    private async Task OpenCreateModal()
+    private async Task OpenModal()
     {
-        var newCode = await InventoryService.GenerateSupplierCodeAsync();
-        CurrentSupplier = new Supplier
-        {
-            SupplierCode = newCode,
-            SupplierName = string.Empty,
+        CurrentSupplier = new Supplier 
+        { 
             IsActive = true,
+            SupplierCode = await InventoryService.GenerateSupplierCodeAsync(),
             CreatedDate = DateTime.Now
         };
         IsEditMode = false;
         ShowModal = true;
     }
+
+    private void CloseModal() { ShowModal = false; }
 
     private void OpenEditModal(Supplier supplier)
     {
@@ -522,494 +317,56 @@
             ContactEmail = supplier.ContactEmail,
             Address = supplier.Address,
             SupplierType = supplier.SupplierType,
-            IsActive = supplier.IsActive,
-            CreatedDate = supplier.CreatedDate,
-            UpdatedDate = supplier.UpdatedDate
+            IsActive = supplier.IsActive
         };
         IsEditMode = true;
         ShowModal = true;
     }
 
-    private void CloseModal() => ShowModal = false;
-
-    private void OpenViewModal(Supplier supplier)
-    {
-        ViewSupplier = supplier;
-        ShowViewModal = true;
-    }
-
-    private void CloseViewModal() => ShowViewModal = false;
-
-    private void OpenInactiveModal() => ShowInactiveModal = true;
-    private void CloseInactiveModal() => ShowInactiveModal = false;
-
-    private void SetInactiveSupplier(Supplier supplier)
-    {
-        InactiveTarget = supplier;
-        ShowConfirmInactive = true;
-    }
-
-    private void CancelSetInactive()
-    {
-        ShowConfirmInactive = false;
-        InactiveTarget = null;
-    }
-
-    // Save operations
     private async Task SaveSupplier()
     {
         try
         {
-            // Trim input values
-            CurrentSupplier.SupplierCode = CurrentSupplier.SupplierCode?.Trim() ?? string.Empty;
-            CurrentSupplier.SupplierName = CurrentSupplier.SupplierName?.Trim() ?? string.Empty;
-            CurrentSupplier.ContactPerson = CurrentSupplier.ContactPerson?.Trim();
-            CurrentSupplier.ContactPhone = CurrentSupplier.ContactPhone?.Trim();
-            CurrentSupplier.ContactEmail = CurrentSupplier.ContactEmail?.Trim();
-            CurrentSupplier.Address = CurrentSupplier.Address?.Trim();
-            CurrentSupplier.SupplierType = CurrentSupplier.SupplierType?.Trim();
-
-            // Validation
-            if (string.IsNullOrWhiteSpace(CurrentSupplier.SupplierCode))
+            if (string.IsNullOrWhiteSpace(CurrentSupplier.SupplierCode) || string.IsNullOrWhiteSpace(CurrentSupplier.SupplierName))
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Supplier Code is required");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(CurrentSupplier.SupplierName))
-            {
-                await JSRuntime.InvokeVoidAsync("alert", "Supplier Name is required");
-                return;
-            }
-
-            // Check for duplicate code (case-insensitive)
-            var existingCode = await DbContext.Suppliers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.SupplierCode.ToLower() == CurrentSupplier.SupplierCode.ToLower() 
-                    && s.SupplierID != CurrentSupplier.SupplierID);
-            
-            if (existingCode != null)
-            {
-                await JSRuntime.InvokeVoidAsync("alert", "Supplier Code already exists. Please use a different code.");
+                await JSRuntime.InvokeVoidAsync("alert", "Please fill in all required fields.");
                 return;
             }
 
             if (IsEditMode)
             {
-                // Update existing supplier using the service
-                var success = await InventoryService.UpdateSupplierAsync(CurrentSupplier);
-                if (!success)
-                {
-                    await JSRuntime.InvokeVoidAsync("alert", "Failed to update supplier. Supplier not found.");
-                    return;
-                }
+                await InventoryService.UpdateSupplierAsync(CurrentSupplier);
             }
             else
             {
-                // Create new supplier using the service
-                CurrentSupplier.CreatedDate = DateTime.Now;
-                CurrentSupplier.IsActive = true;
                 await InventoryService.CreateSupplierAsync(CurrentSupplier);
             }
 
-            await LoadData();
             CloseModal();
-            await JSRuntime.InvokeVoidAsync("alert", IsEditMode ? "Supplier updated successfully" : "Supplier added successfully");
-        }
-        catch (DbUpdateException dbEx)
-        {
-            var innerMessage = dbEx.InnerException?.Message ?? dbEx.Message;
-            Console.WriteLine($"Database error: {innerMessage}");
-            await JSRuntime.InvokeVoidAsync("alert", $"Database error: {innerMessage}");
+            await LoadData();
+            StateHasChanged();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving supplier: {ex.Message}");
             await JSRuntime.InvokeVoidAsync("alert", $"Error saving supplier: {ex.Message}");
         }
     }
 
-    private async Task ConfirmSetInactive()
+    private async Task DeactivateSupplier(Supplier supplier)
     {
-        try
+        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to deactivate {supplier.SupplierName}?"))
         {
-            if (InactiveTarget == null) return;
-
-            await InventoryService.DeactivateSupplierAsync(InactiveTarget.SupplierID);
+            await InventoryService.DeactivateSupplierAsync(supplier.SupplierID);
             await LoadData();
-            await JSRuntime.InvokeVoidAsync("alert", "Supplier set to inactive");
-        }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
-        }
-        finally
-        {
-            ShowConfirmInactive = false;
-            InactiveTarget = null;
+            StateHasChanged();
         }
     }
 
-    private async Task RestoreSupplier(Supplier supplier)
+    private async Task ActivateSupplier(Supplier supplier)
     {
-        try
-        {
-            await InventoryService.ReactivateSupplierAsync(supplier.SupplierID);
-            await LoadData();
-            await JSRuntime.InvokeVoidAsync("alert", "Supplier activated");
-        }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
-        }
+        await InventoryService.ReactivateSupplierAsync(supplier.SupplierID);
+        await LoadData();
+        StateHasChanged();
     }
 }
 
-<style>
-    /* Summary Cards (Premium Design) */
-    .summary-cards {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 24px;
-        margin-bottom: 32px;
-    }
-
-    .summary-card {
-        background: #e0f2f1; /* Light Cyan/Teal */
-        border-radius: 16px;
-        padding: 24px;
-        border: none;
-        box-shadow: none;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        height: 160px;
-        position: relative;
-        transition: transform 0.2s;
-    }
-
-    .summary-card:hover {
-        transform: translateY(-2px);
-    }
-
-    .summary-card .summary-label {
-        color: #0e7490; /* Cyan-700 */
-        font-size: 0.8rem;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-    }
-
-    .summary-card .summary-value {
-        color: #0f172a; /* Slate-900 */
-        font-size: 3.5rem;
-        font-weight: 800;
-        line-height: 1;
-        text-align: right;
-        margin: 0;
-    }
-
-    .summary-card .summary-desc {
-        color: #64748b; /* Slate-500 */
-        font-size: 0.85rem;
-        font-weight: 500;
-        margin-top: auto;
-    }
-
-    /* Danger/Alert Variant */
-    .summary-card.danger {
-        background: #fee2e2; /* Red-100 */
-    }
-
-    .summary-card.danger .summary-label {
-        color: #b91c1c; /* Red-700 */
-    }
-
-    .summary-card.danger .summary-value {
-        color: #b91c1c; /* Red-700 */
-    }
-
-    .summary-card.danger .summary-desc {
-        color: #ef4444; /* Red-500 */
-    }
-
-    /* Toolbar */
-    .user-toolbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    .toolbar-left {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .toolbar-search input {
-        padding: 12px 14px;
-        border-radius: 10px;
-        border: 1px solid #e6e6e6;
-        width: 300px;
-    }
-
-    .filter-select {
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid #e6e6e6;
-    }
-
-    .btn-create {
-        background: #0d9488;
-        color: white;
-        padding: 10px 16px;
-        border-radius: 10px;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-    }
-
-    .btn-secondary {
-        background: #475569;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-    }
-
-    .btn-primary {
-        background: #0f766e;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-
-    /* Panel */
-    .panel-card {
-        background: #ffffff;
-        border-radius: 14px;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-    }
-
-    .panel-body {
-        padding: 16px;
-    }
-
-    /* Table */
-    .user-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .user-table th,
-    .user-table td {
-        padding: 14px 12px;
-        text-align: left;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .user-table th {
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #6b7280;
-        text-transform: uppercase;
-    }
-
-    /* Badges */
-    .type-badge {
-        background: #e0f2f1;
-        color: #0f766e;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-
-    .badge-active {
-        background: #d1fae5;
-        color: #065f46;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-weight: 700;
-        font-size: 0.8rem;
-    }
-
-    .badge-inactive {
-        background: #f1f5f9;
-        color: #64748b;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-weight: 700;
-        font-size: 0.8rem;
-    }
-
-    /* Action Buttons */
-    .btn-icon-action {
-        background: #f1f5f9;
-        border: none;
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .btn-icon-action svg {
-        width: 18px;
-        height: 18px;
-        fill: #64748b;
-        transition: fill 0.2s;
-    }
-
-    .btn-icon-action.edit:hover {
-        background: #0f766e;
-    }
-
-    .btn-icon-action.edit:hover svg {
-        fill: white;
-    }
-
-    .btn-icon-action.view:hover {
-        background: #3b82f6;
-    }
-
-    .btn-icon-action.view:hover svg {
-        fill: white;
-    }
-
-    .btn-icon-action.archive:hover {
-        background: #f59e0b;
-    }
-
-    .btn-icon-action.archive:hover svg {
-        fill: white;
-    }
-
-    /* Modal */
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-    }
-
-    .modal-content {
-        background: white;
-        border-radius: 12px;
-        padding: 16px;
-        box-shadow: 0 8px 24px rgba(2,6,23,0.15);
-        max-height: 90vh;
-        overflow-y: auto;
-    }
-
-    .modal-header-teal {
-        background: linear-gradient(90deg,#064e49,#0f766e);
-        color: white;
-        padding: 12px 16px;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-        margin: -16px -16px 16px -16px;
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
-    }
-
-    .form-group.full-width {
-        grid-column: span 2;
-    }
-
-    .form-label {
-        display: block;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 6px;
-    }
-
-    .form-input,
-    .form-select {
-        padding: 10px 12px;
-        border-radius: 8px;
-        border: 1px solid #e6e6e6;
-        width: 100%;
-        font-size: 0.95rem;
-    }
-
-    textarea.form-input {
-        resize: vertical;
-    }
-
-    .action-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        padding-top: 16px;
-    }
-
-    /* Detail view */
-    .detail-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
-        padding: 16px;
-    }
-
-    .detail-item {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .detail-item.full-width {
-        grid-column: span 2;
-    }
-
-    .detail-label {
-        font-size: 0.75rem;
-        color: #6b7280;
-        text-transform: uppercase;
-        font-weight: 700;
-    }
-
-    .detail-value {
-        font-size: 0.95rem;
-        color: #1e293b;
-    }
-
-    /* No data */
-    .no-data {
-        padding: 40px;
-        text-align: center;
-        color: #6b7280;
-    }
-
-    .loading {
-        padding: 40px;
-        text-align: center;
-        color: #0f766e;
-        font-weight: 600;
-    }
-
-    .error-message {
-        background: #fef2f2;
-        padding: 20px;
-        border-radius: 12px;
-        text-align: center;
-        color: #991b1b;
-    }
-</style>

@@ -1,0 +1,199 @@
+@page "/inventory/consumptions"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject InventoryService InventoryService
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Consumption History</h1>
+            <span class="page-topbar-subtitle">Inventory Usage Tracking</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <div class="page-content">
+        <div class="user-toolbar">
+            <div class="toolbar-left">
+                <div class="toolbar-search">
+                    <input type="text" placeholder="Search by item, room, or service..." @bind="SearchText" @oninput="OnSearchChanged" />
+                </div>
+                <input type="date" class="filter-select" @bind="StartDate" style="margin-right: 10px;" />
+                <input type="date" class="filter-select" @bind="EndDate" />
+            </div>
+            <div>
+                <button class="btn-secondary" @onclick="LoadConsumptions">Apply Filters</button>
+            </div>
+        </div>
+
+        @if (!IsLoaded)
+        {
+            <div class="loading">Loading consumption history...</div>
+        }
+        else if (HasError)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>@ErrorMessage</p>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
+            </div>
+        }
+        else
+        {
+            <div class="panel-card">
+                <div class="panel-body user-list-container">
+                    @if (FilteredConsumptions.Any())
+                    {
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Inventory Item</th>
+                                    <th>Quantity Consumed</th>
+                                    <th>Unit</th>
+                                    <th>Service</th>
+                                    <th>Room Number</th>
+                                    <th>Transaction ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var consumption in PaginatedConsumptions)
+                                {
+                                    <tr>
+                                        <td>@consumption.ConsumptionDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td style="font-weight:600;">@(consumption.InventoryItem?.ItemName ?? "N/A") (@(consumption.InventoryItem?.ItemCode ?? ""))</td>
+                                        <td>@consumption.QuantityConsumed</td>
+                                        <td>@(consumption.InventoryItem?.UnitOfMeasure ?? "-")</td>
+                                        <td>@(consumption.ServiceTransaction?.Service?.ServiceName ?? "N/A")</td>
+                                        <td>@(consumption.RoomNumber ?? "-")</td>
+                                        <td style="font-family:monospace;">@consumption.ServiceTransactionId</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (FilteredConsumptions.Count > 0)
+                        {
+                            <Pagination CurrentPage="@CurrentPage" 
+                                        TotalItems="@FilteredConsumptions.Count" 
+                                        ItemsPerPage="@ItemsPerPage"
+                                        OnPageChanged="@OnPageChanged"
+                                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="no-data">No consumption records found</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string SearchText = "";
+    private DateTime StartDate = DateTime.Now.AddMonths(-1);
+    private DateTime EndDate = DateTime.Now;
+    private bool IsLoaded = false;
+    private bool HasError = false;
+    private string ErrorMessage = string.Empty;
+
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
+
+    private List<InventoryConsumption> Consumptions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConsumptions();
+    }
+
+    private async Task LoadConsumptions()
+    {
+        try
+        {
+            HasError = false;
+            ErrorMessage = string.Empty;
+            IsLoaded = false;
+
+            using var context = ContextFactory.CreateDbContext();
+            
+            Consumptions = await context.InventoryConsumptions
+                .Include(c => c.InventoryItem)
+                .Include(c => c.ServiceTransaction)
+                    .ThenInclude(st => st!.Service)
+                .Where(c => c.ConsumptionDate >= StartDate && c.ConsumptionDate <= EndDate.AddDays(1))
+                .AsNoTracking()
+                .OrderByDescending(c => c.ConsumptionDate)
+                .ToListAsync();
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        await LoadConsumptions();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private List<InventoryConsumption> FilteredConsumptions
+    {
+        get
+        {
+            var list = Consumptions.ToList();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                var search = SearchText.Trim();
+                list = list.Where(c =>
+                    (c.InventoryItem?.ItemName ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (c.InventoryItem?.ItemCode ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (c.RoomNumber ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (c.ServiceTransaction?.Service?.ServiceName ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            return list;
+        }
+    }
+
+    private List<InventoryConsumption> PaginatedConsumptions
+    {
+        get
+        {
+            var filtered = FilteredConsumptions;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+}
+

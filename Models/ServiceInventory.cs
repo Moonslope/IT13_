@@ -6,12 +6,15 @@ namespace HestiaLink.Models
     public class ServiceInventory
     {
         [Key]
+        [Column("ServiceInventoryID")]
         public int ServiceInventoryId { get; set; }
 
         [Required]
+        [Column("ServiceID")]
         public int ServiceId { get; set; }
 
         [Required]
+        [Column("InventoryItemID")]
         public int InventoryItemId { get; set; }
 
         [Required]
@@ -21,10 +24,8 @@ namespace HestiaLink.Models
         public DateTime? CreatedDate { get; set; } = DateTime.Now;
 
         // Navigation Properties
-        [ForeignKey("ServiceId")]
         public Service? Service { get; set; }
 
-        [ForeignKey("InventoryItemId")]
         public InventoryItem? InventoryItem { get; set; }
     }
 }

@@ -1,0 +1,235 @@
+@page "/inventory/dashboard"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject InventoryService InventoryService
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Inventory Dashboard</h1>
+            <span class="page-topbar-subtitle">Overview & Statistics</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <div class="page-content">
+        @if (!IsLoaded)
+        {
+            <div class="loading">Loading inventory data...</div>
+        }
+        else if (HasError)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>@ErrorMessage</p>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
+            </div>
+        }
+        else
+        {
+            <!-- Dashboard Stats -->
+            <div class="dashboard-hero">
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/>
+                        </svg>
+                    </div>
+                    <div class="hero-stat-value">@Summary.TotalItems</div>
+                    <div class="hero-stat-label">Total Items</div>
+                </div>
+
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="hero-stat-value">@Summary.LowStockCount</div>
+                    <div class="hero-stat-label">Low Stock Items</div>
+                </div>
+
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                    </div>
+                    <div class="hero-stat-value">@Summary.OutOfStockCount</div>
+                    <div class="hero-stat-label">Out of Stock</div>
+                </div>
+
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                        </svg>
+                    </div>
+                    <div class="hero-stat-value">@Summary.TotalStockValue.ToString("C")</div>
+                    <div class="hero-stat-label">Total Stock Value</div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Low Stock Alerts -->
+                <div class="premium-card">
+                    <div class="card-header">
+                        <h3>Low Stock Alerts</h3>
+                    </div>
+                    <div class="card-body">
+                        @if (LowStockItems.Any())
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item Code</th>
+                                        <th>Item Name</th>
+                                        <th>Current Stock</th>
+                                        <th>Reorder Point</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in LowStockItems.Take(10))
+                                    {
+                                        <tr>
+                                            <td style="font-family:monospace; font-weight:700;">@item.ItemCode</td>
+                                            <td>@item.ItemName</td>
+                                            <td>@(item.CurrentStock ?? 0)</td>
+                                            <td>@(item.ReorderPoint ?? 0)</td>
+                                            <td>
+                                                <span class="status-low">Low Stock</span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="no-data">No low stock items</div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Recent Purchases -->
+                <div class="premium-card">
+                    <div class="card-header">
+                        <h3>Recent Purchases</h3>
+                    </div>
+                    <div class="card-body">
+                        @if (RecentPurchases.Any())
+                        {
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Purchase #</th>
+                                        <th>Item</th>
+                                        <th>Quantity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var purchase in RecentPurchases.Take(10))
+                                    {
+                                        <tr>
+                                            <td style="font-family:monospace;">@purchase.PurchaseNumber</td>
+                                            <td>@(purchase.InventoryItem?.ItemName ?? "N/A")</td>
+                                            <td>@purchase.Quantity</td>
+                                            <td>
+                                                <span class="status-@(purchase.PurchaseStatus.ToLower())">
+                                                    @purchase.PurchaseStatus
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                        else
+                        {
+                            <div class="no-data">No recent purchases</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="dashboard-row-4">
+                <div class="dashboard-card">
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px;">Suppliers</div>
+                    <div style="font-size: 2rem; font-weight: 800;">@Summary.SupplierCount</div>
+                </div>
+                <div class="dashboard-card">
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px;">Pending Purchases</div>
+                    <div style="font-size: 2rem; font-weight: 800;">@Summary.PendingPurchaseCount</div>
+                </div>
+                <div class="dashboard-card">
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px;">Categories</div>
+                    <div style="font-size: 2rem; font-weight: 800;">@Summary.CategoryCount</div>
+                </div>
+                <div class="dashboard-card">
+                    <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px;">Total Items</div>
+                    <div style="font-size: 2rem; font-weight: 800;">@Summary.TotalItems</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool IsLoaded = false;
+    private bool HasError = false;
+    private string ErrorMessage = string.Empty;
+    private InventoryDashboardSummary Summary = new();
+    private List<InventoryItem> LowStockItems = new();
+    private List<InventoryPurchase> RecentPurchases = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            HasError = false;
+            ErrorMessage = string.Empty;
+
+            using var context = ContextFactory.CreateDbContext();
+            
+            Summary = await InventoryService.GetDashboardSummaryAsync();
+            
+            LowStockItems = await InventoryService.GetLowStockItemsAsync();
+            
+            RecentPurchases = await context.InventoryPurchases
+                .Include(p => p.InventoryItem)
+                .OrderByDescending(p => p.PurchaseDate)
+                .Take(10)
+                .AsNoTracking()
+                .ToListAsync();
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("alert", $"Error loading dashboard: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        IsLoaded = false;
+        StateHasChanged();
+        await Task.Delay(500);
+        await LoadData();
+    }
+}
+
