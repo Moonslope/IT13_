@@ -1,0 +1,421 @@
+@page "/inventory/service-categories"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Service Categories</h1>
+            <span class="page-topbar-subtitle">Category Management</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <div class="page-content">
+        <div class="user-toolbar">
+            <div class="toolbar-left">
+                <div class="toolbar-search">
+                    <input type="text" placeholder="Search by name or function..." @bind="SearchText" @oninput="OnSearchChanged" />
+                </div>
+                <select class="filter-select" @bind="FilterStatus">
+                    <option value="All">All Categories</option>
+                    <option value="Active">Active Only</option>
+                    <option value="Inactive">Inactive Only</option>
+                </select>
+            </div>
+            <div>
+                <button class="btn-create" @onclick="OpenModal">Create New Category</button>
+            </div>
+        </div>
+
+        @if (!IsLoaded)
+        {
+            <div class="loading">Loading service categories...</div>
+        }
+        else if (HasError)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>@ErrorMessage</p>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
+            </div>
+        }
+        else
+        {
+            <div class="panel-card">
+                <div class="panel-body user-list-container">
+                    @if (FilteredCategories.Any())
+                    {
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Category Name</th>
+                                    <th>Description</th>
+                                    <th>Function</th>
+                                    <th>Status</th>
+                                    <th>Services Count</th>
+                                    <th>Created At</th>
+                                    <th>Updated At</th>
+                                    <th style="text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var category in PaginatedCategories)
+                                {
+                                    <tr>
+                                        <td style="font-weight:600;">@category.ServiceCategoryName</td>
+                                        <td>@(category.Description ?? "-")</td>
+                                        <td>@(category.Function ?? "-")</td>
+                                        <td>
+                                            @if ((category.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span class="badge-active">@(category.Status ?? "Active")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-archived">@category.Status</span>
+                                            }
+                                        </td>
+                                        <td>@(category.Services?.Count ?? 0)</td>
+                                        <td>@(category.CreatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td>@(category.UpdatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">
+                                            <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
+                                                <button class="btn-icon-action edit" @onclick="() => OpenEditModal(category)" title="Edit">
+                                                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                                </button>
+                                                <button class="btn-icon-action archive" @onclick="() => DeleteCategory(category)" title="Delete">
+                                                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (FilteredCategories.Count > 0)
+                        {
+                            <Pagination CurrentPage="@CurrentPage" 
+                                        TotalItems="@FilteredCategories.Count" 
+                                        ItemsPerPage="@ItemsPerPage"
+                                        OnPageChanged="@OnPageChanged"
+                                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="no-data">No service categories found</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (ShowModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.4rem;">@(IsEditMode ? "Edit Service Category" : "Create New Service Category")</h2>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Category Name *</label>
+                    <input type="text" class="form-input" @bind="CurrentCategory.ServiceCategoryName" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" @bind="CurrentCategory.Status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Function</label>
+                    <select class="form-select" @bind="CurrentCategory.Function">
+                        <option value="">-- Select Function --</option>
+                        <option value="CheckIn">Check In</option>
+                        <option value="Amenities">Amenities</option>
+                        <option value="Housekeeping">Housekeeping</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Food">Food</option>
+                        <option value="Beverage">Beverage</option>
+                        <option value="Spa">Spa</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group full-width">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-input" @bind="CurrentCategory.Description" rows="3"></textarea>
+                </div>
+            </div>
+
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="SaveCategory">@(IsEditMode ? "Update Category" : "Create Category")</button>
+                <button class="btn-secondary" @onclick="CloseModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string SearchText = "";
+    private string FilterStatus = "All";
+    private bool ShowModal = false;
+    private bool IsEditMode = false;
+    private bool IsLoaded = false;
+    private bool HasError = false;
+    private string ErrorMessage = string.Empty;
+
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
+
+    private ServiceCategory CurrentCategory = new();
+    private List<ServiceCategory> Categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            HasError = false;
+            ErrorMessage = string.Empty;
+
+            using var context = ContextFactory.CreateDbContext();
+            
+            Categories = await context.ServiceCategories
+                .Include(c => c.Services)
+                .AsNoTracking()
+                .OrderBy(c => c.ServiceCategoryName)
+                .ToListAsync();
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        IsLoaded = false;
+        StateHasChanged();
+        await Task.Delay(500);
+        await LoadData();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private List<ServiceCategory> FilteredCategories
+    {
+        get
+        {
+            var list = Categories.ToList();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                var search = SearchText.Trim();
+                list = list.Where(c =>
+                    c.ServiceCategoryName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (c.Description ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (c.Function ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (FilterStatus == "Active")
+                list = list.Where(c => (c.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase)).ToList();
+            else if (FilterStatus == "Inactive")
+                list = list.Where(c => !(c.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            return list.OrderBy(c => c.ServiceCategoryName).ToList();
+        }
+    }
+
+    private List<ServiceCategory> PaginatedCategories
+    {
+        get
+        {
+            var filtered = FilteredCategories;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void OpenModal()
+    {
+        CurrentCategory = new ServiceCategory 
+        { 
+            Status = "Active",
+            CreatedAt = DateTime.UtcNow
+        };
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void CloseModal() { ShowModal = false; }
+
+    private void OpenEditModal(ServiceCategory category)
+    {
+        CurrentCategory = new ServiceCategory
+        {
+            ServiceCategoryId = category.ServiceCategoryId,
+            ServiceCategoryName = category.ServiceCategoryName,
+            Description = category.Description,
+            Status = category.Status,
+            Function = category.Function,
+            CreatedAt = category.CreatedAt,
+            UpdatedAt = category.UpdatedAt
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private async Task SaveCategory()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(CurrentCategory.ServiceCategoryName))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Please fill in the category name.");
+                return;
+            }
+
+            using var context = ContextFactory.CreateDbContext();
+
+            if (IsEditMode)
+            {
+                var existing = await context.ServiceCategories
+                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == CurrentCategory.ServiceCategoryId);
+                
+                if (existing == null)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Category not found.");
+                    return;
+                }
+
+                existing.ServiceCategoryName = CurrentCategory.ServiceCategoryName;
+                existing.Description = CurrentCategory.Description;
+                existing.Status = CurrentCategory.Status;
+                existing.Function = CurrentCategory.Function;
+                existing.UpdatedAt = DateTime.UtcNow;
+
+                await context.SaveChangesAsync();
+            }
+            else
+            {
+                // Check if category name already exists (case-insensitive)
+                var exists = await context.ServiceCategories
+                    .AnyAsync(c => c.ServiceCategoryName.ToLower() == CurrentCategory.ServiceCategoryName.ToLower());
+                
+                if (exists)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "A category with this name already exists.");
+                    return;
+                }
+
+                CurrentCategory.CreatedAt = DateTime.UtcNow;
+                CurrentCategory.UpdatedAt = DateTime.UtcNow;
+                CurrentCategory.Status ??= "Active";
+
+                context.ServiceCategories.Add(CurrentCategory);
+                await context.SaveChangesAsync();
+            }
+
+            CloseModal();
+            await LoadData();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error saving category: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCategory(ServiceCategory category)
+    {
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+            
+            // Check if category has services
+            var hasServices = await context.Services
+                .AnyAsync(s => s.ServiceCategoryId == category.ServiceCategoryId);
+            
+            if (hasServices)
+            {
+                if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+                    $"Category '{category.ServiceCategoryName}' has associated services. Are you sure you want to delete it? This will remove the category from all associated services."))
+                {
+                    return;
+                }
+
+                // Remove category from all services
+                var services = await context.Services
+                    .Where(s => s.ServiceCategoryId == category.ServiceCategoryId)
+                    .ToListAsync();
+                
+                foreach (var service in services)
+                {
+                    service.ServiceCategoryId = null;
+                }
+            }
+            else
+            {
+                if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+                    $"Are you sure you want to delete category '{category.ServiceCategoryName}'?"))
+                {
+                    return;
+                }
+            }
+
+            var existing = await context.ServiceCategories
+                .FirstOrDefaultAsync(c => c.ServiceCategoryId == category.ServiceCategoryId);
+            
+            if (existing != null)
+            {
+                context.ServiceCategories.Remove(existing);
+                await context.SaveChangesAsync();
+            }
+
+            await LoadData();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error deleting category: {ex.Message}");
+        }
+    }
+}
+

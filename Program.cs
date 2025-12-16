@@ -35,7 +35,7 @@ public static class MauiProgram
 
     private static string GetConnectionString()
     {
-        // Connection string for MAUI app
+        // Connection string for MAUI app (local database)
         return "Data Source=MSI\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30";
     }
 }
