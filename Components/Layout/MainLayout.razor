@@ -2,6 +2,9 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject HestiaLink.Services.UserSession UserSession
+@using HestiaLink.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<HestiaLinkContext> DbFactory
 
 <link rel="stylesheet" href="app.css" />
 <link rel="stylesheet" href="logout-styles.css" />

@@ -183,6 +183,41 @@
     </div>
 }
 
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CancelAction">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText = "";
     private string FilterStatus = "Active";
@@ -191,6 +226,15 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private Supplier? SupplierToDeactivate;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     // Pagination
     private int CurrentPage = 1;
@@ -224,7 +268,7 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
-            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            ShowAlert($"Database Error: {ex.Message}");
             IsLoaded = true;
         }
     }
@@ -329,7 +373,7 @@
         {
             if (string.IsNullOrWhiteSpace(CurrentSupplier.SupplierCode) || string.IsNullOrWhiteSpace(CurrentSupplier.SupplierName))
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Please fill in all required fields.");
+                ShowAlert("Please fill in all required fields.");
                 return;
             }
 
@@ -348,18 +392,44 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error saving supplier: {ex.Message}");
+            ShowAlert($"Error saving supplier: {ex.Message}");
         }
     }
 
-    private async Task DeactivateSupplier(Supplier supplier)
+    private void DeactivateSupplier(Supplier supplier)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to deactivate {supplier.SupplierName}?"))
+        SupplierToDeactivate = supplier;
+        ConfirmMessage = $"Are you sure you want to deactivate {supplier.SupplierName}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (SupplierToDeactivate != null)
         {
-            await InventoryService.DeactivateSupplierAsync(supplier.SupplierID);
+            await InventoryService.DeactivateSupplierAsync(SupplierToDeactivate.SupplierID);
             await LoadData();
             StateHasChanged();
         }
+        ShowConfirmModal = false;
+        SupplierToDeactivate = null;
+    }
+
+    private void CancelAction()
+    {
+        ShowConfirmModal = false;
+        SupplierToDeactivate = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
     }
 
     private async Task ActivateSupplier(Supplier supplier)

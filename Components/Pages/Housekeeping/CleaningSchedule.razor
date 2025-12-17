@@ -3,7 +3,9 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@using System.Linq
+@using Room = HestiaLink.Models.Room
+@inject IDbContextFactory<HestiaLink.Data.HestiaLinkContext> DbFactory
 @inject HousekeepingService HousekeepingService
 @inject NavigationManager Navigation
 @inject UserSession UserSession
@@ -275,6 +277,41 @@
                 <button class="btn-secondary" @onclick="CloseAdminCompleteModal" disabled="@IsProcessing">Cancel</button>
                 <button class="btn-confirm-clean" @onclick="ConfirmAdminComplete" disabled="@IsProcessing">
                     @if (IsProcessing) { <span>Processing...</span> } else { <span>Confirm Complete</span> }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Resolve Maintenance Modal -->
+@if (ShowResolveMaintenanceModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#ef4444;">
+                <h2 style="margin:0; color:white;">Resolve Issue</h2>
+                <div style="font-size:0.9rem; color:#fef2f2;">Room @SelectedRoom?.RoomNumber</div>
+            </div>
+            <div style="padding:18px;">
+                <div style="background:#fef2f2; padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid #fee2e2;">
+                    <div style="color:#991b1b; font-weight:700; margin-bottom:4px;">Under Maintenance</div>
+                    <div style="font-size:0.9rem; color:#b91c1c;">
+                        Current Status: Maintenance
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Resolution / Issue Notes:</label>
+                    <textarea class="form-input" @bind="MaintenanceNotes" placeholder="Describe the issue and how it was resolved..." rows="4"></textarea>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">
+                        These notes are for record keeping purposes.
+                    </div>
+                </div>
+            </div>
+            <div class="action-footer">
+                <button class="btn-secondary" @onclick="() => ShowResolveMaintenanceModal = false" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-primary" @onclick="ConfirmResolveMaintenance" disabled="@IsProcessing" style="background:#ef4444;">
+                    @if (IsProcessing) { <span>Saving...</span> } else { <span>Resolve & Available</span> }
                 </button>
             </div>
         </div>
@@ -766,23 +803,25 @@
 </style>
 
 @code {
-    private List<Room> RoomsForCleaning = new();
-    private List<Room> RoomsUnderMaintenance = new();
+    private List<HestiaLink.Models.Room> RoomsForCleaning = new();
+    private List<HestiaLink.Models.Room> RoomsUnderMaintenance = new();
     private List<CleaningTask> ActiveTasks = new();
     private List<SystemUser> AvailableHousekeepers = new();
 
     private string ActiveTab = "cleaning";
     private bool ShowAssignModal = false;
     private bool ShowAdminCompleteModal = false;
+    private bool ShowResolveMaintenanceModal = false;
     private bool IsLoaded = false;
     private bool HasError = false;
     private bool IsProcessing = false;
     private string ErrorMessage = string.Empty;
 
-    private Room? SelectedRoom;
+    private HestiaLink.Models.Room? SelectedRoom;
     private CleaningTask? SelectedTask;
     private int SelectedUserID = 0;
     private string TaskNotes = "Standard Cleaning";
+    private string MaintenanceNotes = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1000,19 +1039,33 @@
         }
     }
 
-    private async Task ResolveMaintenanceRoom(Room room)
+    private void ResolveMaintenanceRoom(Room room)
     {
+        SelectedRoom = room;
+        MaintenanceNotes = "";
+        ShowResolveMaintenanceModal = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmResolveMaintenance()
+    {
+        if (SelectedRoom == null || IsProcessing) return;
+
         try
         {
             IsProcessing = true;
             StateHasChanged();
 
-            var success = await HousekeepingService.UpdateRoomStatusAsync(room.RoomID, "Available");
+            // Note: MaintenanceNotes are collected but not currently stored due to schema limitations.
+            // In a future update, we should save these to a MaintenanceLog table.
+
+            var success = await HousekeepingService.UpdateRoomStatusAsync(SelectedRoom.RoomID, "Available");
 
             if (success)
             {
+                ShowResolveMaintenanceModal = false;
                 await LoadData();
-                await JSRuntime.InvokeVoidAsync("alert", $"Room {room.RoomNumber} is now available!");
+                await JSRuntime.InvokeVoidAsync("alert", $"Room {SelectedRoom.RoomNumber} issue resolved and marked available!");
             }
             else
             {

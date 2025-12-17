@@ -3,7 +3,9 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@using System.Linq
+@using Room = HestiaLink.Models.Room
+@inject IDbContextFactory<HestiaLink.Data.HestiaLinkContext> DbFactory
 @inject HousekeepingService HousekeepingService
 @inject NavigationManager Navigation
 
@@ -103,7 +105,7 @@
         </div>
         
         <Pagination CurrentPage="@CurrentPage" 
-                    TotalItems="@FilteredRooms.Count()" 
+                    TotalItems="@FilteredRooms.ToList().Count" 
                     ItemsPerPage="@ItemsPerPage"
                     OnPageChanged="@OnPageChanged"
                     OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
@@ -111,7 +113,7 @@
 </div>
 
 @code {
-    private List<Room> Rooms = new();
+    private List<HestiaLink.Models.Room> Rooms = new();
     private string SearchTerm = "";
     private string FilterStatus = "";
     
@@ -119,11 +121,11 @@
     private int CurrentPage = 1;
     private int ItemsPerPage = 12;
 
-    private IEnumerable<Room> FilteredRooms => Rooms
+    private IEnumerable<HestiaLink.Models.Room> FilteredRooms => Rooms
         .Where(r => string.IsNullOrEmpty(SearchTerm) || r.RoomNumber.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase))
         .Where(r => string.IsNullOrEmpty(FilterStatus) || r.Status == FilterStatus);
 
-    private IEnumerable<Room> PaginatedRooms => FilteredRooms
+    private IEnumerable<HestiaLink.Models.Room> PaginatedRooms => FilteredRooms
         .Skip((CurrentPage - 1) * ItemsPerPage)
         .Take(ItemsPerPage);
 
@@ -147,7 +149,8 @@
 
     private async Task LoadRooms()
     {
-        Rooms = await DbContext.Rooms
+        using var context = await DbFactory.CreateDbContextAsync();
+        Rooms = await context.Rooms
             .AsNoTracking()
             .Include(r => r.RoomType)
             .ToListAsync();

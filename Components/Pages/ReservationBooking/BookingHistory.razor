@@ -92,7 +92,7 @@
                                     <th>NIGHTS</th>
                                     <th>STATUS</th>
                                     <th>PAYMENT</th>
-                                    <th>TOTAL</th>
+                                    <th style="text-align:right;">TOTAL</th>
                                     <!-- REMOVED ACTIONS COLUMN -->
                                 </tr>
                             </thead>
@@ -117,7 +117,7 @@
                                         <td>
                                             <span class="payment-badge @booking.PaymentStatusClass">@booking.PaymentStatus</span>
                                         </td>
-                                        <td class="amount" style="font-weight: 900; color: #0f766e;">@booking.Total.ToString("C")</td>
+                                        <td class="amount" style="font-weight: 900; color: #0f766e; text-align:right;">@booking.Total.ToString("C")</td>
                                         <!-- REMOVED ACTIONS CELL -->
                                     </tr>
                                 }
@@ -379,37 +379,37 @@
     }
 
     .status-confirmed {
-        background: #dbeafe;
+        background: transparent;
         color: #0369a1;
     }
 
     .status-checked-in {
-        background: #fef3c7;
+        background: transparent;
         color: #92400e;
     }
 
     .status-checked-out {
-        background: #d1fae5;
+        background: transparent;
         color: #065f46;
     }
 
     .status-cancelled {
-        background: #fee2e2;
+        background: transparent;
         color: #991b1b;
     }
 
     .payment-paid {
-        background: #d1fae5;
+        background: transparent;
         color: #065f46;
     }
 
     .payment-pending {
-        background: #fef3c7;
+        background: transparent;
         color: #92400e;
     }
 
     .payment-partial {
-        background: #fed7aa;
+        background: transparent;
         color: #9a3412;
     }
 

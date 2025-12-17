@@ -28,14 +28,14 @@
     right: -50%;
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
     pointer-events: none;
 }
 
 .hero-stat-icon {
     width: 48px;
     height: 48px;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -69,7 +69,7 @@
     font-size: 0.8rem;
     margin-top: 12px;
     padding: 4px 10px;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 20px;
 }
 
@@ -91,7 +91,7 @@
 .premium-card {
     background: white;
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     overflow: hidden;
 }
 
@@ -151,7 +151,7 @@
     background: white;
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
     border-left: 4px solid #0093a0;
 }
 
@@ -178,11 +178,25 @@
 }
 
 /* Accent borders */
-.quick-stat.border-green { border-left-color: #10b981; }
-.quick-stat.border-amber { border-left-color: #f59e0b; }
-.quick-stat.border-red { border-left-color: #ef4444; }
-.quick-stat.border-blue { border-left-color: #3b82f6; }
-.quick-stat.border-purple { border-left-color: #8b5cf6; }
+.quick-stat.border-green {
+    border-left-color: #10b981;
+}
+
+.quick-stat.border-amber {
+    border-left-color: #f59e0b;
+}
+
+.quick-stat.border-red {
+    border-left-color: #ef4444;
+}
+
+.quick-stat.border-blue {
+    border-left-color: #3b82f6;
+}
+
+.quick-stat.border-purple {
+    border-left-color: #8b5cf6;
+}
 
 /* Progress Ring */
 .progress-ring-container {
@@ -335,28 +349,41 @@
 }
 
 .activity-badge.success {
-    background: #d1fae5;
+    background: transparent;
     color: #065f46;
 }
 
 .activity-badge.warning {
-    background: #fef3c7;
+    background: transparent;
     color: #92400e;
 }
 
 .activity-badge.danger {
-    background: #fee2e2;
+    background: transparent;
     color: #991b1b;
 }
 
 /* Responsive */
 @media (max-width: 1200px) {
-    .dashboard-hero { grid-template-columns: repeat(2, 1fr); }
-    .quick-stats-row { grid-template-columns: repeat(3, 1fr); }
-    .dashboard-grid { grid-template-columns: 1fr; }
+    .dashboard-hero {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .quick-stats-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
-    .dashboard-hero { grid-template-columns: 1fr; }
-    .quick-stats-row { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
