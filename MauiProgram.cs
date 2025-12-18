@@ -35,9 +35,8 @@ namespace HestiaIT13Final
             // Add Housekeeping Service
             builder.Services.AddScoped<HousekeepingService>();
 
-            // Connection strings
-            var localConnectionString = "Data Source=MSI\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30";
-            var onlineConnectionString = "Server=db35282.databaseasp.net;Database=db35282;User Id=db35282;Password=c@3E=4Akw#6H;Encrypt=False;MultipleActiveResultSets=True;TrustServerCertificate=True;Connection Timeout=30;";
+            // Add database context with connection string
+            var connectionString = "Data Source=LAPTOP-E5NDCGBJ\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False";
             
             // Register LOCAL database context (scoped) - primary database
             builder.Services.AddDbContext<HestiaLinkContext>(options =>

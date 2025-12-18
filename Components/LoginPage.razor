@@ -9,62 +9,73 @@
 
 <div class="login-page-background">
     <div class="login-card-modern">
-        <div class="login-header">
-            <div class="login-title-section">
-                <h1 class="login-title">HestiaLink<br/>Hospitality<br/>ERP System</h1>
-            </div>
-            <div class="login-logo-section">
-                <img src="/images/hestialogo.png" alt="HestiaLink Logo" class="login-logo" />
+        <!-- Left Column: Branding -->
+        <div class="login-brand-section">
+            <div class="login-brand-content">
+                <div class="login-logo-large">
+                    <img src="/images/hestialogo.png" alt="HestiaLink Logo" />
+                </div>
+                <h1 class="login-brand-title">HestiaLink</h1>
+                <p class="login-brand-subtitle">Hospitality Management System</p>
+                <div class="login-decorative-element"></div>
             </div>
         </div>
 
-        <div class="login-form">
-            <div class="input-group-modern">
-                <label for="username" class="input-label">Username</label>
-                <div class="input-wrapper">
-                    <span class="input-icon">✉️</span>
-                    <input id="username" 
-                           type="text" 
-                           class="input-field" 
-                           placeholder="Enter your username" 
-                           @bind="Username" 
-                           @onkeydown="HandleKeyPress"
-                           disabled="@IsLoading" />
+        <!-- Right Column: Login Form -->
+        <div class="login-form-section">
+            <div class="login-form-content">
+                <h2 class="login-welcome">Welcome Back</h2>
+                <p class="login-description">Sign in to access your dashboard</p>
+
+                <div class="login-form">
+                    <div class="input-group-modern">
+                        <label for="username" class="input-label">Username</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">✉️</span>
+                            <input id="username" 
+                                   type="text" 
+                                   class="input-field" 
+                                   placeholder="Enter your username" 
+                                   @bind="Username" 
+                                   @onkeydown="HandleKeyPress"
+                                   disabled="@IsLoading" />
+                        </div>
+                    </div>
+
+                    <div class="input-group-modern">
+                        <label for="password" class="input-label">Password</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <input id="password" 
+                                   type="password" 
+                                   class="input-field" 
+                                   placeholder="Enter your password" 
+                                   @bind="Password"
+                                   @onkeydown="HandleKeyPress"
+                                   disabled="@IsLoading" />
+                        </div>
+                    </div>
+
+                    <button class="login-button-modern" @onclick="HandleLogin" disabled="@IsLoading">
+                        @if (IsLoading)
+                        {
+                            <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                <span class="spinner"></span>
+                                Logging in...
+                            </span>
+                        }
+                        else
+                        {
+                            <span>Sign In</span>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(Message))
+                    {
+                        <p class="error-message-modern">@Message</p>
+                    }
                 </div>
             </div>
-
-            <div class="input-group-modern">
-                <label for="password" class="input-label">Password</label>
-                <div class="input-wrapper">
-                    <span class="input-icon">🔒</span>
-                    <input id="password" 
-                           type="password" 
-                           class="input-field" 
-                           placeholder="Enter your password" 
-                           @bind="Password"
-                           @onkeydown="HandleKeyPress"
-                           disabled="@IsLoading" />
-                </div>
-            </div>
-
-            <button class="login-button-modern" @onclick="HandleLogin" disabled="@IsLoading">
-                @if (IsLoading)
-                {
-                    <span style="display: inline-flex; align-items: center; gap: 8px;">
-                        <span class="spinner"></span>
-                        Logging in...
-                    </span>
-                }
-                else
-                {
-                    <span>Login</span>
-                }
-            </button>
-
-            @if (!string.IsNullOrEmpty(Message))
-            {
-                <p class="error-message-modern">@Message</p>
-            }
         </div>
     </div>
 </div>

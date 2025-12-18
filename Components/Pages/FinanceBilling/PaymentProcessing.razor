@@ -156,10 +156,13 @@
 
             <div class="form-group" style="margin-bottom: 12px;">
                 <label class="form-label">Invoice ID</label>
-                <div style="display:flex; gap: 8px;">
-                    <input type="text" class="form-input" @bind="NewPayment.InvoiceId" placeholder="Enter Invoice ID" style="flex: 1;" />
-                    <button class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 80px;" @onclick="FetchBillDetails">Search</button>
-                </div>
+                <select class="form-select" @bind="NewPayment.InvoiceId" @bind:after="OnInvoiceSelected">
+                    <option value="0">-- Select an incomplete invoice --</option>
+                    @foreach (var bill in IncompleteBills)
+                    {
+                        <option value="@bill.BillId">INV-@bill.BillId.ToString("D5") - @bill.GuestName (@bill.RoomNumber) - Balance: ₱@bill.Balance.ToString("N2")</option>
+                    }
+                </select>
             </div>
 
             <div class="form-group" style="margin-bottom: 12px;">
@@ -283,11 +286,50 @@
     </div>
 }
 
+<!-- Payment Success Modal -->
+@if (ShowPaymentSuccessModal)
+{
+    <div class="modal-overlay" style="z-index: 9999;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="background: #0f766e; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0; color: white;">✓ Payment Successful</h2>
+                <button @onclick="ClosePaymentSuccessModal" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+            </div>
+            
+            <div style="padding: 24px; text-align: center;">
+                <div style="color: #065f46; background: #d1fae5; padding: 15px; border-radius: 8px; margin-bottom: 16px; font-weight: 600;">
+                    Payment has been successfully processed!
+                </div>
+                
+                <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Amount Paid</div>
+                    <div style="font-size: 1.8rem; font-weight: 900; color: #0f766e;">₱@PaymentSuccessAmount.ToString("N2")</div>
+                </div>
+                
+                <div style="display: grid; gap: 8px; text-align: left; font-size: 0.95rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #6b7280;">Invoice:</span>
+                        <span style="font-weight: 600;">INV-@PaymentSuccessInvoiceId.ToString("D5")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #6b7280;">Reference:</span>
+                        <span style="font-weight: 600; font-family: monospace;">@PaymentSuccessReference</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="padding: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
+                <button class="btn-primary" style="width: 100%; max-width: 200px;" @onclick="ClosePaymentSuccessModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
-    .status-paid { background-color: #d1fae5; color: #065f46; }
-    .status-partial { background-color: #fef3c7; color: #92400e; }
-    .status-pending { background-color: #fee2e2; color: #991b1b; }
-    .status-refunded { background-color: var(--color-light-gray); color: var(--color-dark-teal); }
+    .status-paid { color: #065f46; }
+    .status-partial { color: #92400e; }
+    .status-pending { color: #991b1b; }
+    .status-refunded { color: var(--color-dark-teal); }
     
     /* Pagination Styles */
     .pagination-container {
@@ -431,7 +473,16 @@
         public string Status { get; set; } = "Pending";
     }
 
+    public class IncompleteBillViewModel
+    {
+        public int BillId { get; set; }
+        public string GuestName { get; set; } = "";
+        public string RoomNumber { get; set; } = "";
+        public decimal Balance { get; set; }
+    }
+
     private List<PaymentViewModel> Payments = new List<PaymentViewModel>();
+    private List<IncompleteBillViewModel> IncompleteBills = new List<IncompleteBillViewModel>();
     private PaymentViewModel NewPayment = new PaymentViewModel();
     private string SearchText = "";
     private string PaymentStatusFilter = "";
@@ -441,7 +492,13 @@
     private string PaymentErrorMessage = ""; // For validation errors
     private string PaymentSuccessMessage = ""; // For success messages
     private bool ShowReceiptModal = false;
+    private bool ShowPaymentSuccessModal = false;
     private PaymentViewModel? SelectedPayment = null;
+    
+    // Success modal data
+    private decimal PaymentSuccessAmount = 0;
+    private int PaymentSuccessInvoiceId = 0;
+    private string PaymentSuccessReference = "";
 
     private decimal TodayPayments => Payments.Where(p => p.PaymentDate.Date == DateTime.Now.Date).Sum(p => p.AmountPaid);
     private int PendingCount => Payments.Count(p => p.Status == "Pending" || p.Status == "Partial"); // Logic adjustment
@@ -502,6 +559,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadPayments();
+        await LoadIncompleteBills();
     }
 
     private async Task LoadPayments()
@@ -539,8 +597,38 @@
         }
     }
 
-    private void OpenProcessPaymentModal()
+    private async Task LoadIncompleteBills()
     {
+        try
+        {
+            var incompleteBills = await _context.Bills
+                .Include(b => b.Reservation!)
+                .ThenInclude(r => r!.Guest)
+                .Include(b => b.Reservation!)
+                .ThenInclude(r => r!.ReservedRooms)
+                .ThenInclude(rr => rr.Room)
+                .Where(b => b.BillStatus == "Pending" || b.BillStatus == "Partial")
+                .ToListAsync();
+
+            IncompleteBills = incompleteBills.Select(b => new IncompleteBillViewModel
+            {
+                BillId = b.BillId,
+                GuestName = b.Reservation?.Guest != null ? $"{b.Reservation.Guest.FirstName} {b.Reservation.Guest.LastName}" : "Unknown",
+                RoomNumber = b.Reservation?.ReservedRooms.FirstOrDefault()?.Room?.RoomNumber ?? "N/A",
+                Balance = (b.GrandTotal ?? 0) - (b.AmountPaid ?? 0)
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading incomplete bills: {ex.Message}");
+        }
+    }
+
+    private async Task OpenProcessPaymentModal()
+    {
+        // Reload incomplete bills to get latest data
+        await LoadIncompleteBills();
+
         // Generate auto reference number: REF-yyyyMMddHHmmss
         var refNumber = $"REF-{DateTime.Now:yyyyMMddHHmmss}";
         NewPayment = new PaymentViewModel { PaymentDate = DateTime.Now, PaymentMethod = "Cash", ReferenceNumber = refNumber };
@@ -548,6 +636,14 @@
         PaymentErrorMessage = "";
         PaymentSuccessMessage = "";
         ShowProcessModal = true;
+    }
+
+    private async Task OnInvoiceSelected()
+    {
+        if (NewPayment.InvoiceId > 0)
+        {
+            await FetchBillDetails();
+        }
     }
 
     private async Task FetchBillDetails()
@@ -643,6 +739,11 @@
                     }
 
                     await transaction.CommitAsync();
+
+                    // Store success data for modal
+                     PaymentSuccessAmount = NewPayment.AmountPaid;
+                    PaymentSuccessInvoiceId = NewPayment.InvoiceId;
+                    PaymentSuccessReference = NewPayment.ReferenceNumber;
                 }
                 catch
                 {
@@ -653,6 +754,9 @@
 
             await LoadPayments();
             CloseModals();
+            
+            // Show success modal
+            ShowPaymentSuccessModal = true;
         }
         catch (Exception ex)
         {
@@ -812,5 +916,10 @@
     {
         ShowProcessModal = false;
         ShowReceiptModal = false;
+    }
+    
+    private void ClosePaymentSuccessModal()
+    {
+        ShowPaymentSuccessModal = false;
     }
 }
