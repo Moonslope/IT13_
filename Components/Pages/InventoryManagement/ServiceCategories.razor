@@ -175,23 +175,7 @@
     </div>
 }
 
-@if (ShowConfirmModal)
-{
-    <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
-                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
-            </div>
-            <div style="padding: 24px;">
-                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
-            </div>
-            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
-                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmDeleteAction">Confirm</button>
-                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
-            </div>
-        </div>
-    </div>
-}
+
 
 @if (ShowAlertModal)
 {
