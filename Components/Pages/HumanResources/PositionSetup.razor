@@ -2,6 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.EntityFrameworkCore.Infrastructure
 @inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject HestiaLink.Services.DualWriteService DualWriteService
 @inject IJSRuntime JSRuntime
 @layout HestiaIT13Final.Components.Layout.MainLayout
 
@@ -504,41 +505,46 @@
 
         try
         {
-            using var context = ContextFactory.CreateDbContext();
             if (IsEditMode)
             {
-                var existing = await context.Positions.FindAsync(CurrentPos.PositionId);
-                if (existing != null)
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
                 {
-                    existing.DepartmentId = CurrentPos.DepartmentId;
-                    existing.PositionTitle = CurrentPos.PositionTitle;
-                    existing.PositionLevel = CurrentPos.PositionLevel;
-                    existing.PayGrade = CurrentPos.PayGrade;
-                    existing.Salary = CurrentPos.Salary;
-                    existing.JobDescription = CurrentPos.JobDescription;
-                    existing.Status = CurrentPos.Status;
-                    context.Positions.Update(existing);
-                    await context.SaveChangesAsync();
-
-                    // update local copy
-                    var local = Positions.FirstOrDefault(p => p.PositionId == existing.PositionId);
-                    if (local != null)
+                    var existing = await context.Positions.FindAsync(CurrentPos.PositionId);
+                    if (existing != null)
                     {
-                        local.DepartmentId = existing.DepartmentId;
-                        local.Department = Departments.FirstOrDefault(d => d.DepartmentId == existing.DepartmentId);
-                        local.PositionTitle = existing.PositionTitle;
-                        local.PositionLevel = existing.PositionLevel;
-                        local.PayGrade = existing.PayGrade;
-                        local.Salary = existing.Salary;
-                        local.JobDescription = existing.JobDescription;
-                        local.Status = existing.Status;
+                        existing.DepartmentId = CurrentPos.DepartmentId;
+                        existing.PositionTitle = CurrentPos.PositionTitle;
+                        existing.PositionLevel = CurrentPos.PositionLevel;
+                        existing.PayGrade = CurrentPos.PayGrade;
+                        existing.Salary = CurrentPos.Salary;
+                        existing.JobDescription = CurrentPos.JobDescription;
+                        existing.Status = CurrentPos.Status;
+                        context.Positions.Update(existing);
+                        await context.SaveChangesAsync();
+
+                        // update local copy
+                        var local = Positions.FirstOrDefault(p => p.PositionId == existing.PositionId);
+                        if (local != null)
+                        {
+                            local.DepartmentId = existing.DepartmentId;
+                            local.Department = Departments.FirstOrDefault(d => d.DepartmentId == existing.DepartmentId);
+                            local.PositionTitle = existing.PositionTitle;
+                            local.PositionLevel = existing.PositionLevel;
+                            local.PayGrade = existing.PayGrade;
+                            local.Salary = existing.Salary;
+                            local.JobDescription = existing.JobDescription;
+                            local.Status = existing.Status;
+                        }
                     }
-                }
+                }, "Position", CurrentPos);
             }
             else
             {
-                context.Positions.Add(CurrentPos);
-                await context.SaveChangesAsync();
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.Positions.Add(CurrentPos);
+                    await context.SaveChangesAsync();
+                }, "Position", CurrentPos);
                 await LoadData();
             }
 

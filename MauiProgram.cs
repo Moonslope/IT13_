@@ -38,24 +38,70 @@ namespace HestiaIT13Final
             // Add database context with connection string
             var connectionString = "Data Source=LAPTOP-E5NDCGBJ\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False";
             
-            // Register DbContext for services that need scoped instances
+            // Register LOCAL database context (scoped) - primary database
             builder.Services.AddDbContext<HestiaLinkContext>(options =>
-                options.UseSqlServer(connectionString,
+                options.UseSqlServer(localConnectionString,
                 sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
                     maxRetryCount: 5,
                     maxRetryDelay: TimeSpan.FromSeconds(10),
                     errorNumbersToAdd: null
-                )));
+                )), ServiceLifetime.Scoped);
             
-            // Register DbContextFactory for components to avoid threading issues
-            // This ensures each operation gets its own context instance
+            // Register LOCAL DbContextFactory for components to avoid threading issues
             builder.Services.AddDbContextFactory<HestiaLinkContext>(options =>
-                options.UseSqlServer(connectionString,
+                options.UseSqlServer(localConnectionString,
                 sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
                     maxRetryCount: 5,
                     maxRetryDelay: TimeSpan.FromSeconds(10),
                     errorNumbersToAdd: null
-                )));
+                )), ServiceLifetime.Singleton);
+
+            // Register ONLINE database context factory
+            builder.Services.AddSingleton<OnlineDbContextFactory>(sp =>
+            {
+                var optionsBuilder = new DbContextOptionsBuilder<HestiaLinkContext>();
+                optionsBuilder.UseSqlServer(onlineConnectionString,
+                    sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(10),
+                        errorNumbersToAdd: null
+                    ));
+                return new OnlineDbContextFactory(optionsBuilder.Options);
+            });
+
+            // Register NetworkService (singleton) - for connectivity checks
+            builder.Services.AddSingleton<NetworkService>();
+
+            // Register PendingChangesTracker (singleton) - for offline queue
+            builder.Services.AddSingleton<PendingChangesTracker>();
+
+            // Register SyncService (scoped) - for dual-write and sync operations
+            builder.Services.AddScoped<SyncService>(sp =>
+            {
+                // Get local context (primary database)
+                var localContext = sp.GetRequiredService<HestiaLinkContext>();
+                
+                // Create online context manually with online connection string
+                var onlineOptions = new DbContextOptionsBuilder<HestiaLinkContext>()
+                    .UseSqlServer(onlineConnectionString,
+                        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(10),
+                            errorNumbersToAdd: null
+                        ))
+                    .Options;
+                var onlineContext = new HestiaLinkContext(onlineOptions);
+                
+                var networkService = sp.GetRequiredService<NetworkService>();
+                var pendingTracker = sp.GetRequiredService<PendingChangesTracker>();
+                var logger = sp.GetService<ILogger<SyncService>>();
+                
+                return new SyncService(localContext, onlineContext, networkService, pendingTracker, logger);
+            });
+
+            // Register legacy services for backward compatibility
+            builder.Services.AddSingleton<ConnectionStatusService>();
+            builder.Services.AddScoped<DualWriteService>();
 
             builder.Services.AddScoped<DbSeeder>();
 
@@ -75,6 +121,30 @@ namespace HestiaIT13Final
             //         await seeder.SeedAsync();
             //     }
             // });
+
+            // Start background sync service
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(5000); // Wait 5 seconds after startup
+                while (true)
+                {
+                    try
+                    {
+                        using var scope = app.Services.CreateScope();
+                        var syncService = scope.ServiceProvider.GetRequiredService<SyncService>();
+                        
+                        if (await syncService.IsOnlineAsync())
+                        {
+                            await syncService.SyncPendingAsync();
+                        }
+                    }
+                    catch
+                    {
+                        // Silently handle sync errors
+                    }
+                    await Task.Delay(30000); // Check every 30 seconds
+                }
+            });
 
             return app;
         }
