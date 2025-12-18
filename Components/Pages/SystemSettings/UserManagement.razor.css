@@ -1,4 +1,4 @@
-﻿/* User Grid Layout */
+/* User Grid Layout */
 .user-grid-container {
     padding: 20px 0;
 }
@@ -22,10 +22,10 @@
     gap: 15px;
 }
 
-    .user-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        transform: translateY(-2px);
-    }
+.user-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
 
 .selected-card {
     border-color: #3b82f6;
@@ -127,23 +127,23 @@
     gap: 6px;
 }
 
-    .btn-action.edit {
-        background: #3b82f6;
-        color: white;
-    }
+.btn-action.edit {
+    background: #3b82f6;
+    color: white;
+}
 
-        .btn-action.edit:hover {
-            background: #2563eb;
-        }
+.btn-action.edit:hover {
+    background: #2563eb;
+}
 
-    .btn-action.archive {
-        background: #f59e0b;
-        color: white;
-    }
+.btn-action.archive {
+    background: #f59e0b;
+    color: white;
+}
 
-        .btn-action.archive:hover {
-            background: #d97706;
-        }
+.btn-action.archive:hover {
+    background: #d97706;
+}
 
 .btn-icon {
     font-size: 0.9rem;
@@ -151,7 +151,7 @@
 
 /* Status Badges */
 .badge-active {
-    background: #dcfce7;
+    background: transparent;
     color: #166534;
     padding: 4px 8px;
     border-radius: 12px;
@@ -160,7 +160,7 @@
 }
 
 .badge-inactive {
-    background: #f3f4f6;
+    background: transparent;
     color: #6b7280;
     padding: 4px 8px;
     border-radius: 12px;
@@ -214,19 +214,16 @@
     max-width: 300px;
 }
 
-    .toolbar-search input {
-        width: 100%;
-        padding: 10px 16px 10px 40px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 0.9rem;
-    }
+.toolbar-search input {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
 
 .search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    display: none;
     color: #6b7280;
 }
 
@@ -251,9 +248,9 @@
     transition: background 0.2s ease;
 }
 
-    .btn-create:hover {
-        background: #059669;
-    }
+.btn-create:hover {
+    background: #059669;
+}
 
 .btn-secondary {
     background: #6b7280;
@@ -266,9 +263,9 @@
     transition: background 0.2s ease;
 }
 
-    .btn-secondary:hover {
-        background: #4b5563;
-    }
+.btn-secondary:hover {
+    background: #4b5563;
+}
 
 /* Modal Styles */
 .modal-overlay {
@@ -314,9 +311,9 @@
     flex-direction: column;
 }
 
-    .form-group.full-width {
-        grid-column: 1 / -1;
-    }
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
 
 .form-label {
     font-weight: 600;
@@ -325,7 +322,8 @@
     font-size: 0.9rem;
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
     padding: 10px 12px;
     border: 1px solid #d1d5db;
     border-radius: 6px;
@@ -333,11 +331,12 @@
     transition: border-color 0.2s ease;
 }
 
-    .form-input:focus, .form-select:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
 
 .action-footer {
     padding: 20px;
@@ -358,9 +357,9 @@
     transition: background 0.2s ease;
 }
 
-    .btn-primary:hover {
-        background: #2563eb;
-    }
+.btn-primary:hover {
+    background: #2563eb;
+}
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -386,35 +385,6 @@
     }
 }
 
-/* Page Wrapper Styles */
-.page-wrapper {
-    min-height: 100vh;
-    background: #f8fafc;
-}
-
-.page-topbar {
-    background: white;
-    padding: 24px;
-    border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 0;
-}
-
-    .page-topbar h1 {
-        margin: 0 0 4px 0;
-        font-size: 1.875rem;
-        font-weight: 700;
-        color: #111827;
-    }
-
-.page-topbar-subtitle {
-    color: #6b7280;
-    font-size: 0.875rem;
-}
-
-.page-content {
-    padding: 24px;
-}
-
 /* Panel Card Styles */
 .panel-card {
     background: white;
@@ -436,25 +406,25 @@
     border-collapse: collapse;
 }
 
-    .user-table th {
-        background: #f9fafb;
-        padding: 12px 16px;
-        text-align: left;
-        font-weight: 600;
-        color: #374151;
-        border-bottom: 1px solid #e5e7eb;
-        font-size: 0.875rem;
-    }
+.user-table th {
+    background: #f9fafb;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+}
 
-    .user-table td {
-        padding: 16px;
-        border-bottom: 1px solid #f3f4f6;
-        color: #6b7280;
-    }
+.user-table td {
+    padding: 16px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #6b7280;
+}
 
-    .user-table tr:last-child td {
-        border-bottom: none;
-    }
+.user-table tr:last-child td {
+    border-bottom: none;
+}
 
 .selected-row {
     background-color: #f0f9ff;

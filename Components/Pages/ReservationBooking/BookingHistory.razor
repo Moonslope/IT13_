@@ -1,4 +1,4 @@
-﻿@page "/reservations/booking-history"
+@page "/reservations/booking-history"
 @using HestiaLink.Data
 @using HestiaLink.Models
 @using Microsoft.EntityFrameworkCore
@@ -53,7 +53,6 @@
                 <!-- Right - Search Bar -->
                 <div class="right-filters">
                     <div class="search-box">
-                        <span class="search-icon">🔍</span>
                         <input type="text" placeholder="Search by guest name or booking ID..."
                                @bind="SearchText"
                                @bind:event="oninput" />
@@ -74,7 +73,7 @@
                 else if (!Bookings.Any())
                 {
                     <div class="empty-state">
-                        <div class="empty-icon">📋</div>
+                        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
                         <p>No bookings found</p>
                         <small>Try adjusting your search or date filters</small>
                     </div>
@@ -93,7 +92,7 @@
                                     <th>NIGHTS</th>
                                     <th>STATUS</th>
                                     <th>PAYMENT</th>
-                                    <th>TOTAL</th>
+                                    <th style="text-align:right;">TOTAL</th>
                                     <!-- REMOVED ACTIONS COLUMN -->
                                 </tr>
                             </thead>
@@ -118,7 +117,7 @@
                                         <td>
                                             <span class="payment-badge @booking.PaymentStatusClass">@booking.PaymentStatus</span>
                                         </td>
-                                        <td class="amount" style="font-weight: 900; color: #0f766e;">@booking.Total.ToString("C")</td>
+                                        <td class="amount" style="font-weight: 900; color: #0f766e; text-align:right;">@booking.Total.ToString("C")</td>
                                         <!-- REMOVED ACTIONS CELL -->
                                     </tr>
                                 }
@@ -127,23 +126,11 @@
                     </div>
 
                     <!-- Pagination -->
-                    <div class="pagination-section">
-                        <div class="pagination-info">
-                            Showing <strong>@((CurrentPage - 1) * PageSize + 1)</strong> to <strong>@Math.Min(CurrentPage * PageSize, TotalCount)</strong> of <strong>@TotalCount</strong> bookings
-                        </div>
-                        <div class="pagination-controls">
-                            <button class="pagination-btn" disabled="@(CurrentPage == 1)" @onclick="PreviousPage">← Previous</button>
-                            <span class="page-indicator">Page @CurrentPage of @TotalPages</span>
-                            <button class="pagination-btn" disabled="@(CurrentPage == TotalPages)" @onclick="NextPage">Next →</button>
-
-                            <select class="page-size-select" @onchange="OnPageSizeChanged" value="@PageSize">
-                                <option value="10">10 per page</option>
-                                <option value="25">25 per page</option>
-                                <option value="50">50 per page</option>
-                                <option value="100">100 per page</option>
-                            </select>
-                        </div>
-                    </div>
+                    <Pagination CurrentPage="@CurrentPage" 
+                                TotalItems="@TotalCount" 
+                                ItemsPerPage="@PageSize"
+                                OnPageChanged="@OnPageChanged"
+                                OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
                 }
             </div>
         </div>
@@ -257,7 +244,7 @@
 
         .search-box input {
             width: 100%;
-            padding: 10px 14px 10px 40px;
+            padding: 10px 14px;
             border: 2px solid #e5e7eb;
             border-radius: 6px;
             font-size: 0.9rem;
@@ -272,11 +259,7 @@
             }
 
     .search-icon {
-        position: absolute;
-        left: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #64748b;
+        display: none;
         font-size: 1rem;
         z-index: 1;
     }
@@ -396,37 +379,37 @@
     }
 
     .status-confirmed {
-        background: #dbeafe;
+        background: transparent;
         color: #0369a1;
     }
 
     .status-checked-in {
-        background: #fef3c7;
+        background: transparent;
         color: #92400e;
     }
 
     .status-checked-out {
-        background: #d1fae5;
+        background: transparent;
         color: #065f46;
     }
 
     .status-cancelled {
-        background: #fee2e2;
+        background: transparent;
         color: #991b1b;
     }
 
     .payment-paid {
-        background: #d1fae5;
+        background: transparent;
         color: #065f46;
     }
 
     .payment-pending {
-        background: #fef3c7;
+        background: transparent;
         color: #92400e;
     }
 
     .payment-partial {
-        background: #fed7aa;
+        background: transparent;
         color: #9a3412;
     }
 
@@ -672,6 +655,22 @@
             IsLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async void OnPageChanged(int page)
+    {
+        if (page >= 1 && page <= TotalPages && page != CurrentPage)
+        {
+            CurrentPage = page;
+            await LoadBookings();
+        }
+    }
+
+    private async void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        PageSize = itemsPerPage;
+        CurrentPage = 1;
+        await LoadBookings();
     }
 
     private async Task LoadBookingsFromView()

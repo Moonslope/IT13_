@@ -1,10 +1,11 @@
-﻿@page "/finance/billing-invoices"
+@page "/finance/billing-invoices"
 @layout MainLayout
 @using HestiaLink.Data
 @using HestiaLink.Models
 @using Microsoft.EntityFrameworkCore
 @inject HestiaLinkContext _context
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -16,27 +17,39 @@
     </header>
 
     <section class="page-content">
-        <!-- Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
-            <div class="stat-card">
-                <div class="stat-title">Total Invoices</div>
-                <div class="stat-value">@Invoices.Count</div>
-                <div class="stat-desc">All generated bills</div>
+        <!-- Summary Cards - Dashboard Style -->
+        <div class="dashboard-hero" style="margin-bottom:32px;">
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                </div>
+                <div class="hero-stat-value">@Invoices.Count</div>
+                <div class="hero-stat-label">Total Invoices</div>
+                <div class="hero-stat-change">All generated bills</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">Total Revenue</div>
-                <div class="stat-value">₱@TotalRevenue.ToString("N2")</div>
-                <div class="stat-desc">Paid amount so far</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                </div>
+                <div class="hero-stat-value">&#8369;@TotalRevenue.ToString("N2")</div>
+                <div class="hero-stat-label">Total Revenue</div>
+                <div class="hero-stat-change">Paid amount so far</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">VAT Collected</div>
-                <div class="stat-value">₱@TotalVAT.ToString("N2")</div>
-                <div class="stat-desc">12% Tax portion</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </div>
+                <div class="hero-stat-value">&#8369;@TotalVAT.ToString("N2")</div>
+                <div class="hero-stat-label">VAT Collected</div>
+                <div class="hero-stat-change">12% Tax portion</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">Service Charge</div>
-                <div class="stat-value">₱@TotalServiceCharge.ToString("N2")</div>
-                <div class="stat-desc">10% Service fee</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/></svg>
+                </div>
+                <div class="hero-stat-value">&#8369;@TotalServiceCharge.ToString("N2")</div>
+                <div class="hero-stat-label">Service Charge</div>
+                <div class="hero-stat-change">10% Service fee</div>
             </div>
         </div>
 
@@ -44,18 +57,15 @@
         <div class="user-toolbar">
             <div class="toolbar-left">
                 <div class="toolbar-search" style="position: relative;">
-                    <input type="text" placeholder="Search by guest or invoice ID..." @bind="SearchText" style="padding-left: 40px; width: 100%;" />
-                    <span class="search-icon" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%);">🔍</span>
+                    <input type="text" placeholder="Search by guest or invoice ID..." @bind="SearchText" @bind:event="oninput" style="width: 100%;" />
                 </div>
                 <select class="filter-select" @bind="StatusFilter">
                     <option value="">All Status</option>
                     <option value="Pending">Pending</option>
                     <option value="Paid">Paid</option>
-                    <option value="Overdue">Overdue</option>
-                    <option value="Cancelled">Cancelled</option>
+                    <option value="Partial">Partial</option>
                 </select>
             </div>
-            <button class="btn-create" @onclick="OpenCreateInvoiceModal">Create Invoice</button>
         </div>
 
         <!-- Invoices Table -->
@@ -69,16 +79,16 @@
                             <th>Room</th>
                             <th>Check-In</th>
                             <th>Check-Out</th>
-                            <th>Subtotal</th>
-                            <th>VAT (12%)</th>
-                            <th>Service Charge (10%)</th>
-                            <th>Total Amount</th>
+                            <th style="text-align:right;">Subtotal</th>
+                            <th style="text-align:right;">VAT (12%)</th>
+                            <th style="text-align:right;">Service Charge (10%)</th>
+                            <th style="text-align:right;">Total Amount</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var invoice in FilteredInvoices)
+                        @foreach (var invoice in PaginatedInvoices)
                         {
                             <tr>
                                 <td style="font-weight: 700; color: var(--color-teal);">INV-@invoice.Id.ToString("D5")</td>
@@ -86,10 +96,10 @@
                                 <td>@invoice.RoomNumber</td>
                                 <td>@invoice.CheckInDate.ToString("MMM dd, yyyy")</td>
                                 <td>@invoice.CheckOutDate.ToString("MMM dd, yyyy")</td>
-                                <td>₱@invoice.Subtotal.ToString("N2")</td>
-                                <td>₱@invoice.VAT.ToString("N2")</td>
-                                <td>₱@invoice.ServiceCharge.ToString("N2")</td>
-                                <td style="font-weight: 900; color: var(--color-dark-teal);">₱@invoice.TotalAmount.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.Subtotal.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.VAT.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.ServiceCharge.ToString("N2")</td>
+                                <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@invoice.TotalAmount.ToString("N2")</td>
                                 <td>
                                     <span class="status-badge status-@invoice.Status.ToLower()">@invoice.Status</span>
                                 </td>
@@ -108,153 +118,128 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            <Pagination CurrentPage="@CurrentPage" 
+                        TotalItems="@TotalFilteredCount" 
+                        ItemsPerPage="@PageSize"
+                        OnPageChanged="@OnPageChanged"
+                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
         </div>
     </section>
 </div>
 
-<!-- Create Invoice Modal -->
-@if (ShowCreateModal)
-{
-    <div class="modal-overlay" @onclick="CloseModals">
-        <div class="modal-content" style="max-width: 700px;" @onclick:stopPropagation="true">
-            <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.4rem;">Create New Invoice</h2>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <div class="form-group">
-                    <label class="form-label">Guest Name</label>
-                    <input type="text" class="form-input" @bind="NewInvoice.GuestName" placeholder="Enter guest name" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Room Number</label>
-                    <input type="text" class="form-input" @bind="NewInvoice.RoomNumber" placeholder="e.g., 101" />
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <div class="form-group">
-                    <label class="form-label">Check-In Date</label>
-                    <input type="date" class="form-input" @bind="NewInvoice.CheckInDate" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Check-Out Date</label>
-                    <input type="date" class="form-input" @bind="NewInvoice.CheckOutDate" />
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label class="form-label">Room Rate per Night</label>
-                <input type="number" class="form-input" @bind="NewInvoice.RoomRate" placeholder="0.00" />
-            </div>
-
-            <!-- Bill Computation Preview -->
-            <div style="background-color: var(--color-cream); padding: 20px; border-radius: 12px; border: 2px solid var(--color-light-gray); margin-bottom: 20px;">
-                <h3 style="margin-top:0; color: var(--color-dark-teal); font-size:1.1rem; font-weight: 900;">Bill Computation</h3>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="font-weight: 600;">Number of Nights:</span>
-                    <span style="font-weight: 700;">@CalculateNights() night(s)</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="font-weight: 600;">Room Charges:</span>
-                    <span style="font-weight: 700;">₱@(NewInvoice.RoomRate * CalculateNights()).ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="font-weight: 600;">Additional Charges:</span>
-                    <span style="font-weight: 700;">₱@NewInvoice.AdditionalCharges.ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; padding-top: 8px; border-top: 1px solid var(--color-light-gray);">
-                    <span style="font-weight: 700;">Subtotal:</span>
-                    <span style="font-weight: 900; color: var(--color-teal);">₱@CalculateSubtotal().ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--color-dark-teal);">
-                    <span style="font-weight: 600;">VAT (12%):</span>
-                    <span style="font-weight: 700;">₱@CalculateVAT().ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; color: var(--color-dark-teal);">
-                    <span style="font-weight: 600;">Service Charge (10%):</span>
-                    <span style="font-weight: 700;">₱@CalculateServiceCharge().ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid var(--color-dark-teal);">
-                    <span style="font-weight: 900; font-size: 1.2rem; color: var(--color-dark-teal);">Total Amount:</span>
-                    <span style="font-weight: 900; font-size: 1.3rem; color: var(--color-teal);">₱@CalculateTotal().ToString("N2")</span>
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label class="form-label">Additional Charges (Optional)</label>
-                <input type="number" class="form-input" @bind="NewInvoice.AdditionalCharges" placeholder="Extra services, minibar, etc." />
-            </div>
-
-            <div style="display: flex; gap: 12px;">
-                <button class="btn-primary" style="flex: 1;" @onclick="SaveInvoice">Create Invoice</button>
-                <button class="btn-secondary" style="flex: 1;" @onclick="CloseModals">Cancel</button>
-            </div>
-        </div>
-    </div>
-}
 
 <!-- Invoice Details Modal -->
 @if (ShowDetailsModal && SelectedInvoice != null)
 {
-    <div class="modal-overlay" @onclick="CloseModals">
-        <div class="modal-content" style="max-width: 600px;" @onclick:stopPropagation="true">
+    <div class="modal-overlay" @onclick="CloseDetailsModal">
+        <div class="modal-content invoice-detail-modal" @onclick:stopPropagation="true">
             <div class="modal-header-teal">
                 <h2 style="margin:0; font-size:1.4rem;">Invoice Details - INV-@SelectedInvoice.Id.ToString("D5")</h2>
+                <span class="status-badge status-@SelectedInvoice.Status.ToLower()" style="margin-left: auto;">@SelectedInvoice.Status</span>
             </div>
 
-            <div style="background: var(--color-cream); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                    <div>
-                        <div style="font-weight: 600; color: var(--color-dark-teal); margin-bottom: 4px;">Guest Name:</div>
-                        <div style="font-weight: 700;">@SelectedInvoice.GuestName</div>
-                    </div>
-                    <div>
-                        <div style="font-weight: 600; color: var(--color-dark-teal); margin-bottom: 4px;">Room Number:</div>
-                        <div style="font-weight: 700;">@SelectedInvoice.RoomNumber</div>
-                    </div>
+            <!-- Guest & Stay Info - Compact Header -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; background: var(--color-cream); padding: 16px 20px; border-radius: 8px; margin-bottom: 16px;">
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-dark-teal); margin-bottom: 2px;">Guest Name</div>
+                    <div style="font-weight: 700;">@SelectedInvoice.GuestName</div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div>
-                        <div style="font-weight: 600; color: var(--color-dark-teal); margin-bottom: 4px;">Check-In:</div>
-                        <div style="font-weight: 700;">@SelectedInvoice.CheckInDate.ToString("MMM dd, yyyy")</div>
-                    </div>
-                    <div>
-                        <div style="font-weight: 600; color: var(--color-dark-teal); margin-bottom: 4px;">Check-Out:</div>
-                        <div style="font-weight: 700;">@SelectedInvoice.CheckOutDate.ToString("MMM dd, yyyy")</div>
-                    </div>
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-dark-teal); margin-bottom: 2px;">Room</div>
+                    <div style="font-weight: 700;">@SelectedInvoice.RoomNumber</div>
                 </div>
-            </div>
-
-            <div style="background: var(--color-white); padding: 20px; border-radius: 8px; border: 1px solid var(--color-light-gray);">
-                <h3 style="margin-top: 0; color: var(--color-dark-teal); font-weight: 900;">Billing Summary</h3>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span>Subtotal:</span>
-                    <span style="font-weight: 700;">₱@SelectedInvoice.Subtotal.ToString("N2")</span>
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-dark-teal); margin-bottom: 2px;">Check-In</div>
+                    <div style="font-weight: 700;">@SelectedInvoice.CheckInDate.ToString("MMM dd, yyyy")</div>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span>VAT (12%):</span>
-                    <span style="font-weight: 700;">₱@SelectedInvoice.VAT.ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--color-light-gray);">
-                    <span>Service Charge (10%):</span>
-                    <span style="font-weight: 700;">₱@SelectedInvoice.ServiceCharge.ToString("N2")</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
-                    <span style="font-weight: 900; color: var(--color-dark-teal);">Total Amount:</span>
-                    <span style="font-weight: 900; color: var(--color-teal);">₱@SelectedInvoice.TotalAmount.ToString("N2")</span>
+                <div>
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--color-dark-teal); margin-bottom: 2px;">Check-Out</div>
+                    <div style="font-weight: 700;">@SelectedInvoice.CheckOutDate.ToString("MMM dd, yyyy")</div>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 12px; margin-top: 20px;">
+            <!-- Two Column Layout: Bill Items + Summary -->
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
+                <!-- Bill Items -->
+                <div style="background: var(--color-white); padding: 16px; border-radius: 8px; border: 1px solid var(--color-light-gray);">
+                    <h3 style="margin: 0 0 12px 0; color: var(--color-dark-teal); font-weight: 900; font-size: 1rem;">Bill Items</h3>
+                    @if (SelectedInvoice.BillItems.Any())
+                    {
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid var(--color-light-gray);">
+                                    <th style="text-align: left; padding: 6px 4px; font-weight: 700; color: var(--color-dark-teal);">Description</th>
+                                    <th style="text-align: center; padding: 6px 4px; font-weight: 700; color: var(--color-dark-teal);">Qty</th>
+                                    <th style="text-align: right; padding: 6px 4px; font-weight: 700; color: var(--color-dark-teal);">Unit Price</th>
+                                    <th style="text-align: right; padding: 6px 4px; font-weight: 700; color: var(--color-dark-teal);">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in SelectedInvoice.BillItems)
+                                {
+                                    <tr style="border-bottom: 1px solid var(--color-light-gray);">
+                                        <td style="padding: 8px 4px;">@item.Description</td>
+                                        <td style="text-align: center; padding: 8px 4px;">@item.Quantity</td>
+                                        <td style="text-align: right; padding: 8px 4px;">&#8369;@item.UnitPrice.ToString("N2")</td>
+                                        <td style="text-align: right; padding: 8px 4px; font-weight: 700;">&#8369;@item.TotalAmount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div style="color: var(--color-dark-teal); font-style: italic; padding: 8px 0; font-size: 0.9rem;">No itemized details available.</div>
+                    }
+                </div>
+
+                <!-- Billing Summary -->
+                <div style="background: var(--color-white); padding: 16px; border-radius: 8px; border: 1px solid var(--color-light-gray);">
+                    <h3 style="margin: 0 0 12px 0; color: var(--color-dark-teal); font-weight: 900; font-size: 1rem;">Billing Summary</h3>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                        <span>Subtotal:</span>
+                        <span style="font-weight: 700;">&#8369;@SelectedInvoice.Subtotal.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                        <span>VAT (12%):</span>
+                        <span style="font-weight: 700;">&#8369;@SelectedInvoice.VAT.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--color-light-gray); font-size: 0.9rem;">
+                        <span>Service Charge (10%):</span>
+                        <span style="font-weight: 700;">&#8369;@SelectedInvoice.ServiceCharge.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <span style="font-weight: 900; color: var(--color-dark-teal);">Grand Total:</span>
+                        <span style="font-weight: 900; color: var(--color-teal); font-size: 1.1rem;">&#8369;@SelectedInvoice.TotalAmount.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                        <span style="color: #065f46;">Amount Paid:</span>
+                        <span style="font-weight: 700; color: #065f46;">&#8369;@SelectedInvoice.AmountPaid.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid var(--color-dark-teal);">
+                        <span style="font-weight: 900; color: @(SelectedInvoice.BalanceDue > 0 ? "#991b1b" : "#065f46");">Balance Due:</span>
+                        <span style="font-weight: 900; font-size: 1.1rem; color: @(SelectedInvoice.BalanceDue > 0 ? "#991b1b" : "#065f46");">&#8369;@SelectedInvoice.BalanceDue.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
                 <button class="btn-primary" style="flex: 1;" @onclick="() => PrintInvoice(SelectedInvoice)">Print Invoice</button>
-                <button class="btn-secondary" style="flex: 1;" @onclick="CloseModals">Close</button>
+                <button class="btn-secondary" style="flex: 1;" @onclick="CloseDetailsModal">Close</button>
             </div>
         </div>
     </div>
 }
 
 <style>
+    .invoice-detail-modal {
+        max-width: 1000px !important;
+        width: 95%;
+    }
+
     .stat-card {
         background: var(--color-white);
         padding: 20px;
@@ -263,8 +248,8 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-        height: auto; /* Fix for text overflow */
-        min-height: 120px; /* Optional: minimum height for consistency */
+        height: auto;
+        min-height: 120px;
     }
     
     .stat-desc {
@@ -301,9 +286,70 @@
         background-color: var(--color-light-gray);
         color: var(--color-dark-teal);
     }
-</style>
 
+    .status-partial {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 0;
+        margin-top: 16px;
+        border-top: 1px solid var(--color-light-gray);
+    }
+
+    .pagination-info {
+        font-size: 0.9rem;
+        color: var(--color-dark-teal);
+    }
+
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-page {
+        background: var(--color-white);
+        border: 1px solid var(--color-light-gray);
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .btn-page:hover:not(:disabled) {
+        background: var(--color-teal);
+        color: white;
+        border-color: var(--color-teal);
+    }
+
+    .btn-page:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .page-indicator {
+        padding: 0 12px;
+        font-weight: 700;
+        color: var(--color-dark-teal);
+    }
+</style>
 @code {
+    // Bill Item ViewModel
+    public class BillItemViewModel
+    {
+        public string Description { get; set; } = "";
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TotalAmount { get; set; }
+        public DateTime? TransactionDate { get; set; }
+    }
+
     // UI Logic Model
     public class Invoice
     {
@@ -318,16 +364,21 @@
         public decimal VAT { get; set; }
         public decimal ServiceCharge { get; set; }
         public decimal TotalAmount { get; set; }
+        public decimal AmountPaid { get; set; }
+        public decimal BalanceDue { get; set; }
         public string Status { get; set; } = "Pending";
+        public List<BillItemViewModel> BillItems { get; set; } = new();
     }
 
     private List<Invoice> Invoices = new List<Invoice>();
-    private Invoice NewInvoice = new Invoice();
     private Invoice? SelectedInvoice = null;
     private string SearchText = "";
     private string StatusFilter = "";
-    private bool ShowCreateModal = false;
     private bool ShowDetailsModal = false;
+    
+    // Pagination
+    private int CurrentPage = 1;
+    private int PageSize = 10;
 
     private decimal TotalRevenue => Invoices.Where(i => i.Status == "Paid").Sum(i => i.TotalAmount);
     private decimal TotalVAT => Invoices.Where(i => i.Status == "Paid").Sum(i => i.VAT);
@@ -341,6 +392,28 @@
         .OrderByDescending(i => i.Id)
         .ToList();
 
+    private int TotalFilteredCount => FilteredInvoices.Count;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalFilteredCount / PageSize));
+    
+    private List<Invoice> PaginatedInvoices => FilteredInvoices
+        .Skip((CurrentPage - 1) * PageSize)
+        .Take(PageSize)
+        .ToList();
+
+    private void OnPageChanged(int page)
+    {
+        if (page >= 1 && page <= TotalPages)
+        {
+            CurrentPage = page;
+        }
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        PageSize = itemsPerPage;
+        CurrentPage = 1;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadInvoices();
@@ -351,25 +424,36 @@
         try
         {
             var bills = await _context.Bills
-                .Include(b => b.Reservation)
-                .ThenInclude(r => r.Guest)
-                .Include(b => b.Reservation)
-                .ThenInclude(r => r.ReservedRooms)
+                .Include(b => b.BillDetails)
+                .Include(b => b.Reservation!)
+                .ThenInclude(r => r!.Guest)
+                .Include(b => b.Reservation!)
+                .ThenInclude(r => r!.ReservedRooms)
                 .ThenInclude(rr => rr.Room)
                 .ToListAsync();
 
-            Invoices = bills.Select(b => new Invoice
+            Invoices = bills.Where(b => b.Reservation != null).Select(b => new Invoice
             {
                 Id = b.BillId,
                 GuestName = b.Reservation?.Guest != null ? $"{b.Reservation.Guest.FirstName} {b.Reservation.Guest.LastName}" : "Unknown Guest",
-                RoomNumber = b.Reservation?.ReservedRooms.FirstOrDefault()?.Room?.RoomNumber ?? "N/A",
+                RoomNumber = b.Reservation?.ReservedRooms?.FirstOrDefault()?.Room?.RoomNumber ?? "N/A",
                 CheckInDate = b.Reservation?.CreatedDate ?? DateTime.MinValue,
                 CheckOutDate = (b.Reservation?.CreatedDate ?? DateTime.Now).AddDays(1),
                 Subtotal = b.SubtotalAmount ?? 0,
                 TotalAmount = b.GrandTotal ?? 0,
+                AmountPaid = b.AmountPaid ?? 0,
+                BalanceDue = b.BalanceDue ?? ((b.GrandTotal ?? 0) - (b.AmountPaid ?? 0)),
                 Status = b.BillStatus ?? "Pending",
                 VAT = (b.SubtotalAmount ?? 0) * 0.12m,
-                ServiceCharge = (b.SubtotalAmount ?? 0) * 0.10m
+                ServiceCharge = (b.SubtotalAmount ?? 0) * 0.10m,
+                BillItems = b.BillDetails.Select(d => new BillItemViewModel
+                {
+                    Description = d.Description ?? "Item",
+                    Quantity = d.Quantity ?? 1,
+                    UnitPrice = d.UnitPrice ?? 0,
+                    TotalAmount = d.TotalAmount ?? 0,
+                    TransactionDate = d.TransactionDate
+                }).ToList()
             }).ToList();
         }
         catch (Exception ex)
@@ -378,124 +462,19 @@
         }
     }
 
-    private void OpenCreateInvoiceModal()
-    {
-        NewInvoice = new Invoice 
-        { 
-            CheckInDate = DateTime.Now,
-            CheckOutDate = DateTime.Now.AddDays(1),
-            RoomRate = 2500,
-            AdditionalCharges = 0
-        };
-        ShowCreateModal = true;
-    }
-
     private void ViewInvoiceDetails(Invoice invoice)
     {
         SelectedInvoice = invoice;
         ShowDetailsModal = true;
     }
 
-    private void CloseModals()
+    private void CloseDetailsModal()
     {
-        ShowCreateModal = false;
         ShowDetailsModal = false;
-    }
-
-    private int CalculateNights()
-    {
-        var nights = (NewInvoice.CheckOutDate - NewInvoice.CheckInDate).Days;
-        return nights > 0 ? nights : 1;
-    }
-
-    private decimal CalculateSubtotal()
-    {
-        return (NewInvoice.RoomRate * CalculateNights()) + NewInvoice.AdditionalCharges;
-    }
-
-    private decimal CalculateVAT()
-    {
-        return CalculateSubtotal() * 0.12m;
-    }
-
-    private decimal CalculateServiceCharge()
-    {
-        return CalculateSubtotal() * 0.10m;
-    }
-
-    private decimal CalculateTotal()
-    {
-        return CalculateSubtotal() + CalculateVAT() + CalculateServiceCharge();
-    }
-
-    private async Task SaveInvoice()
-    {
-        using var transaction = _context.Database.BeginTransaction();
-        try
-        {
-            // Parse Guest Name
-            var names = NewInvoice.GuestName.Split(" ");
-            var firstName = names.Length > 0 ? names[0] : "Guest";
-            var lastName = names.Length > 1 ? string.Join(" ", names.Skip(1)) : "";
-
-            var newGuest = new Guest
-            {
-                FirstName = firstName,
-                LastName = lastName,
-                CreatedDate = NewInvoice.CheckInDate
-            };
-            _context.Guests.Add(newGuest);
-            await _context.SaveChangesAsync();
-
-            var newReservation = new Reservation
-            {
-                GuestId = newGuest.GuestId,
-                Status = "Confirmed",
-                PaymentStatus = "Pending",
-                TotalPayment = CalculateTotal(),
-                CreatedDate = NewInvoice.CheckInDate
-            };
-            _context.Reservations.Add(newReservation);
-            await _context.SaveChangesAsync();
-
-            if (!string.IsNullOrEmpty(NewInvoice.RoomNumber))
-            {
-                var room = await _context.Rooms.FirstOrDefaultAsync(r => r.RoomNumber == NewInvoice.RoomNumber);
-                if (room != null)
-                {
-                    _context.ReservedRooms.Add(new ReservedRoom
-                    {
-                        ReservationId = newReservation.ReservationId,
-                        RoomId = room.RoomId
-                    });
-                }
-            }
-
-            var newBill = new Bill
-            {
-                ReservationId = newReservation.ReservationId,
-                BillDate = DateTime.Now,
-                SubtotalAmount = CalculateSubtotal(),
-                GrandTotal = CalculateTotal(),
-                BillStatus = "Pending"
-            };
-            _context.Bills.Add(newBill);
-            await _context.SaveChangesAsync();
-
-            await transaction.CommitAsync();
-
-            await LoadInvoices();
-            CloseModals();
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            Console.WriteLine($"Error saving invoice: {ex.Message}");
-        }
     }
 
     private void PrintInvoice(Invoice invoice)
     {
-        // Print logic placeholder
+        // Print functionality placeholder - requires custom implementation for MAUI WebView
     }
 }

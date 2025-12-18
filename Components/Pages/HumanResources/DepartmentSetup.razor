@@ -1,8 +1,9 @@
-﻿@page "/hr/department-setup"
+@page "/hr/department-setup"
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext Context
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
 @inject IJSRuntime JSRuntime
-@layout MainLayout
+@layout HestiaIT13Final.Components.Layout.MainLayout
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -19,7 +20,6 @@
         <div class="toolbar-left">
             <div class="toolbar-search">
                 <input type="text" placeholder="Search departments..." @bind="SearchText" @oninput="OnSearchChanged" />
-                <span class="search-icon"></span>
             </div>
         </div>
         <div>
@@ -70,7 +70,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var dept in FilteredDepartments)
+                            @foreach (var dept in PaginatedDepartments)
                             {
                                 <tr>
                                     <td>@dept.DepartmentId</td>
@@ -99,6 +99,14 @@
                             }
                         </tbody>
                     </table>
+                    @if (FilteredDepartments.Count > 0)
+                    {
+                        <Pagination CurrentPage="@CurrentPage" 
+                                    TotalItems="@FilteredDepartments.Count" 
+                                    ItemsPerPage="@ItemsPerPage"
+                                    OnPageChanged="@OnPageChanged"
+                                    OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                    }
                 }
                 else
                 {
@@ -281,6 +289,11 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = "";
+    
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
+    
     private Department CurrentDept = new();
     private Department ArchiveDept = new();
     private List<Department> Departments = new();
@@ -303,7 +316,8 @@
             HasError = false;
             ErrorMessage = "";
 
-            Departments = await Context.Departments
+            using var context = ContextFactory.CreateDbContext();
+            Departments = await context.Departments
                 .AsNoTracking()
                 .OrderBy(d => d.DepartmentName)
                 .ToListAsync();
@@ -344,6 +358,7 @@
     private void OnSearchChanged(ChangeEventArgs e)
     {
         SearchText = e.Value?.ToString() ?? "";
+        CurrentPage = 1; // Reset to first page when searching
         StateHasChanged();
     }
 
@@ -361,6 +376,28 @@
 
             return query.OrderBy(d => d.DepartmentName).ToList();
         }
+    }
+
+    private List<Department> PaginatedDepartments
+    {
+        get
+        {
+            var filtered = FilteredDepartments;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
     }
 
     private void OpenCreateModal()
@@ -411,11 +448,12 @@
     {
         try
         {
-            var department = await Context.Departments.FindAsync(CurrentDept.DepartmentId);
+            using var context = ContextFactory.CreateDbContext();
+            var department = await context.Departments.FindAsync(CurrentDept.DepartmentId);
             if (department != null)
             {
-                Context.Departments.Remove(department);
-                await Context.SaveChangesAsync();
+                context.Departments.Remove(department);
+                await context.SaveChangesAsync();
 
                 // Remove from local list
                 Departments.RemoveAll(d => d.DepartmentId == CurrentDept.DepartmentId);
@@ -447,12 +485,13 @@
     {
         try
         {
-            var department = await Context.Departments.FindAsync(dept.DepartmentId);
+            using var context = ContextFactory.CreateDbContext();
+            var department = await context.Departments.FindAsync(dept.DepartmentId);
             if (department != null)
             {
                 department.Status = "Active";
-                Context.Departments.Update(department);
-                await Context.SaveChangesAsync();
+                context.Departments.Update(department);
+                await context.SaveChangesAsync();
 
                 // Update local list
                 var localDept = Departments.FirstOrDefault(d => d.DepartmentId == dept.DepartmentId);
@@ -481,12 +520,13 @@
     {
         try
         {
-            var department = await Context.Departments.FindAsync(ArchiveDept.DepartmentId);
+            using var context = ContextFactory.CreateDbContext();
+            var department = await context.Departments.FindAsync(ArchiveDept.DepartmentId);
             if (department != null)
             {
                 department.Status = "Archived";
-                Context.Departments.Update(department);
-                await Context.SaveChangesAsync();
+                context.Departments.Update(department);
+                await context.SaveChangesAsync();
 
                 // Update local list
                 var localDept = Departments.FirstOrDefault(d => d.DepartmentId == ArchiveDept.DepartmentId);
@@ -516,16 +556,17 @@
 
         try
         {
+            using var context = ContextFactory.CreateDbContext();
             if (IsEditMode)
             {
-                var existingDept = await Context.Departments.FindAsync(CurrentDept.DepartmentId);
+                var existingDept = await context.Departments.FindAsync(CurrentDept.DepartmentId);
                 if (existingDept != null)
                 {
                     existingDept.DepartmentName = CurrentDept.DepartmentName;
                     existingDept.Description = CurrentDept.Description;
                     existingDept.Status = CurrentDept.Status;
-                    Context.Departments.Update(existingDept);
-                    await Context.SaveChangesAsync();
+                    context.Departments.Update(existingDept);
+                    await context.SaveChangesAsync();
 
                     // Update local list
                     var localDept = Departments.FirstOrDefault(d => d.DepartmentId == CurrentDept.DepartmentId);
@@ -540,8 +581,8 @@
             }
             else
             {
-                Context.Departments.Add(CurrentDept);
-                await Context.SaveChangesAsync();
+                context.Departments.Add(CurrentDept);
+                await context.SaveChangesAsync();
 
                 // Reload to get the new department with ID
                 await LoadDepartments();

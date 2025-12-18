@@ -1,0 +1,382 @@
+@page "/inventory/service-inventory"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject InventoryService InventoryService
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Service Inventory Links</h1>
+            <span class="page-topbar-subtitle">Link Services to Inventory Items</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <div class="page-content">
+        <div class="user-toolbar">
+            <div class="toolbar-left">
+                <div class="toolbar-search">
+                    <input type="text" placeholder="Search by service or item..." @bind="SearchText" @oninput="OnSearchChanged" />
+                </div>
+                <select class="filter-select" @bind="FilterService">
+                    <option value="0">All Services</option>
+                    @foreach (var service in Services)
+                    {
+                        <option value="@service.ServiceId">@service.ServiceName</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <button class="btn-create" @onclick="OpenModal">Create New Link</button>
+            </div>
+        </div>
+
+        @if (!IsLoaded)
+        {
+            <div class="loading">Loading service inventory links...</div>
+        }
+        else if (HasError)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>@ErrorMessage</p>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
+            </div>
+        }
+        else
+        {
+            <div class="panel-card">
+                <div class="panel-body user-list-container">
+                    @if (FilteredLinks.Any())
+                    {
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Inventory Item</th>
+                                    <th>Quantity Required</th>
+                                    <th>Unit</th>
+                                    <th>Created Date</th>
+                                    <th style="text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var link in PaginatedLinks)
+                                {
+                                    <tr>
+                                        <td style="font-weight:600;">@(link.Service?.ServiceName ?? "N/A")</td>
+                                        <td>@(link.InventoryItem?.ItemName ?? "N/A") (@(link.InventoryItem?.ItemCode ?? ""))</td>
+                                        <td>@link.QuantityRequired</td>
+                                        <td>@(link.InventoryItem?.UnitOfMeasure ?? "-")</td>
+                                        <td>@(link.CreatedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">
+                                            <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
+                                                <button class="btn-icon-action archive" @onclick="() => RemoveLink(link)" title="Remove Link">
+                                                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (FilteredLinks.Count > 0)
+                        {
+                            <Pagination CurrentPage="@CurrentPage" 
+                                        TotalItems="@FilteredLinks.Count" 
+                                        ItemsPerPage="@ItemsPerPage"
+                                        OnPageChanged="@OnPageChanged"
+                                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="no-data">No service inventory links found</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (ShowModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.4rem;">Create Service Inventory Link</h2>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Service *</label>
+                    <select class="form-select" @bind="SelectedServiceId">
+                        <option value="0">-- Select Service --</option>
+                        @foreach (var service in Services)
+                        {
+                            <option value="@service.ServiceId">@service.ServiceName</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Inventory Item *</label>
+                    <select class="form-select" @bind="SelectedItemId">
+                        <option value="0">-- Select Item --</option>
+                        @foreach (var item in InventoryItems)
+                        {
+                            <option value="@item.ItemId">@item.ItemName (@item.ItemCode)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Quantity Required *</label>
+                    <input type="number" step="0.01" class="form-input" @bind="QuantityRequired" />
+                </div>
+            </div>
+
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="SaveLink">Create Link</button>
+                <button class="btn-secondary" @onclick="CloseModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string SearchText = "";
+    private int FilterService = 0;
+    private bool ShowModal = false;
+    private bool IsLoaded = false;
+    private bool HasError = false;
+    private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private ServiceInventory? LinkToRemove;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
+
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
+
+    private int SelectedServiceId = 0;
+    private int SelectedItemId = 0;
+    private decimal QuantityRequired = 1.0m;
+
+    private List<ServiceInventory> Links = new();
+    private List<Service> Services = new();
+    private List<InventoryItem> InventoryItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            HasError = false;
+            ErrorMessage = string.Empty;
+
+            using var context = ContextFactory.CreateDbContext();
+            
+            Links = await context.ServiceInventories
+                .Include(si => si.Service)
+                .Include(si => si.InventoryItem)
+                .AsNoTracking()
+                .OrderBy(si => si.Service!.ServiceName)
+                .ToListAsync();
+
+            Services = await context.Services
+                .Where(s => s.IsActive == true)
+                .AsNoTracking()
+                .OrderBy(s => s.ServiceName)
+                .ToListAsync();
+
+            InventoryItems = await context.InventoryItems
+                .Where(i => i.IsActive == true)
+                .AsNoTracking()
+                .OrderBy(i => i.ItemName)
+                .ToListAsync();
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            ShowAlert($"Database Error: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        IsLoaded = false;
+        StateHasChanged();
+        await Task.Delay(500);
+        await LoadData();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private List<ServiceInventory> FilteredLinks
+    {
+        get
+        {
+            var list = Links.ToList();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                var search = SearchText.Trim();
+                list = list.Where(l =>
+                    (l.Service?.ServiceName ?? "").Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (l.InventoryItem?.ItemName ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (FilterService > 0)
+                list = list.Where(l => l.ServiceId == FilterService).ToList();
+
+            return list.OrderBy(l => l.Service!.ServiceName).ToList();
+        }
+    }
+
+    private List<ServiceInventory> PaginatedLinks
+    {
+        get
+        {
+            var filtered = FilteredLinks;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void OpenModal()
+    {
+        SelectedServiceId = 0;
+        SelectedItemId = 0;
+        QuantityRequired = 1.0m;
+        ShowModal = true;
+    }
+
+    private void CloseModal() { ShowModal = false; }
+
+    private async Task SaveLink()
+    {
+        try
+        {
+            if (SelectedServiceId == 0 || SelectedItemId == 0 || QuantityRequired <= 0)
+            {
+                ShowAlert("Please fill in all required fields.");
+                return;
+            }
+
+            await InventoryService.CreateServiceInventoryLinkAsync(SelectedServiceId, SelectedItemId, QuantityRequired);
+            
+            CloseModal();
+            await LoadData();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error creating link: {ex.Message}");
+        }
+    }
+
+    private void RemoveLink(ServiceInventory link)
+    {
+        LinkToRemove = link;
+        ConfirmMessage = $"Remove link between {link.Service?.ServiceName} and {link.InventoryItem?.ItemName}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (LinkToRemove != null)
+        {
+            await InventoryService.RemoveServiceInventoryLinkAsync(LinkToRemove.ServiceInventoryId);
+            await LoadData();
+            StateHasChanged();
+        }
+        CloseConfirmModal();
+    }
+
+    private void CloseConfirmModal()
+    {
+        ShowConfirmModal = false;
+        LinkToRemove = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
+    }
+}
+

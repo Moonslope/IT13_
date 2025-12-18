@@ -1,0 +1,139 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="pagination-container" style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+    <div class="pagination-controls" style="display: flex; align-items: center; gap: 8px;">
+        <button class="pagination-btn" @onclick="GoToFirstPage" disabled="@(CurrentPage == 1)" 
+                style="padding: 8px 12px; border: 1px solid #0093a0; background: white; color: #0093a0; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            &lt;
+        </button>
+        
+        @foreach (var pg in GetVisiblePages())
+        {
+            @if (pg == -1)
+            {
+                <span class="pagination-ellipsis" style="padding: 8px;">...</span>
+            }
+            else
+            {
+                <button class="pagination-btn @(pg == CurrentPage ? "active" : "")" 
+                        @onclick="() => GoToPage(pg)"
+                        style="padding: 8px 12px; border: 1px solid #0093a0; background: @(pg == CurrentPage ? "#0093a0" : "white"); color: @(pg == CurrentPage ? "white" : "#0093a0"); border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    @pg
+                </button>
+            }
+        }
+        
+        <button class="pagination-btn" @onclick="GoToLastPage" disabled="@(CurrentPage == TotalPages)"
+                style="padding: 8px 12px; border: 1px solid #0093a0; background: white; color: #0093a0; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            &gt;
+        </button>
+    </div>
+    
+    <div class="pagination-info" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 20px;">
+        <div class="pagination-results" style="color: #475569; font-size: 0.9rem;">
+            Results: @((CurrentPage - 1) * ItemsPerPage + 1) - @(Math.Min(CurrentPage * ItemsPerPage, TotalItems)) of @TotalItems
+        </div>
+        <div class="pagination-items-per-page" style="display: flex; align-items: center; gap: 8px; color: #475569; font-size: 0.9rem;">
+            <label>Items per page:</label>
+            <select value="@ItemsPerPage" @onchange="HandleItemsPerPageChanged"
+                    style="padding: 6px 12px; border: 1px solid #0093a0; border-radius: 6px; color: #0093a0; font-weight: 600; cursor: pointer;">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public int ItemsPerPage { get; set; } = 10;
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public EventCallback<int> OnItemsPerPageChangedCallback { get; set; }
+
+    private int TotalPages => (int)Math.Ceiling((double)TotalItems / ItemsPerPage);
+
+    private List<int> GetVisiblePages()
+    {
+        var pages = new List<int>();
+        var maxVisible = 7;
+        var sidePages = 2;
+
+        if (TotalPages <= maxVisible)
+        {
+            for (int i = 1; i <= TotalPages; i++)
+            {
+                pages.Add(i);
+            }
+        }
+        else
+        {
+            // Always show first page
+            pages.Add(1);
+
+            int startPage = Math.Max(2, CurrentPage - sidePages);
+            int endPage = Math.Min(TotalPages - 1, CurrentPage + sidePages);
+
+            if (startPage > 2)
+            {
+                pages.Add(-1); // Ellipsis
+            }
+
+            for (int i = startPage; i <= endPage; i++)
+            {
+                pages.Add(i);
+            }
+
+            if (endPage < TotalPages - 1)
+            {
+                pages.Add(-1); // Ellipsis
+            }
+
+            // Always show last page
+            if (TotalPages > 1)
+            {
+                pages.Add(TotalPages);
+            }
+        }
+
+        return pages;
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page >= 1 && page <= TotalPages && page != CurrentPage)
+        {
+            CurrentPage = page;
+            await OnPageChanged.InvokeAsync(page);
+        }
+    }
+
+    private async Task GoToFirstPage()
+    {
+        if (CurrentPage > 1)
+        {
+            await GoToPage(1);
+        }
+    }
+
+    private async Task GoToLastPage()
+    {
+        if (CurrentPage < TotalPages)
+        {
+            await GoToPage(TotalPages);
+        }
+    }
+
+    private async Task HandleItemsPerPageChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newItemsPerPage) && newItemsPerPage > 0)
+        {
+            ItemsPerPage = newItemsPerPage;
+            CurrentPage = 1; // Reset to first page when changing items per page
+            await OnItemsPerPageChangedCallback.InvokeAsync(newItemsPerPage);
+            await OnPageChanged.InvokeAsync(1);
+        }
+    }
+}

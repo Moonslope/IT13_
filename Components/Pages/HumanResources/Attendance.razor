@@ -1,9 +1,10 @@
-﻿@page "/hr/attendance"
+@page "/hr/attendance"
 @using HestiaLink.Data
 @using HestiaLink.Models
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
 @using AttendanceRecord = HestiaLink.Models.Attendance
-@inject HestiaLinkContext Context
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
 @inject IJSRuntime JSRuntime
 @layout MainLayout
 
@@ -11,33 +12,45 @@
     <header class="page-topbar">
         <div>
             <h1>Attendance Management</h1>
-            <span class="page-topbar-subtitle">@SelectedDate.ToString("dddd, MMMM dd, yyyy")</span>
+            <span class="page-topbar-subtitle">@RangeLabel</span>
         </div>
         <UserDropdown />
     </header>
 
     <div class="page-content">
-    <!-- Summary Cards -->
-    <div class="summary-cards">
-        <div class="summary-card @(SelectedFilter == "Present" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Present"))" style="cursor:pointer;">
-            <div class="summary-label">PRESENT</div>
-            <div class="summary-value" style="color: #047857;">@PresentCount</div>
-            <div class="summary-desc">Employees present today</div>
+    <!-- Summary Cards - Dashboard Style -->
+    <div class="dashboard-hero" style="margin-bottom:32px;">
+        <div class="hero-stat @(SelectedFilter == "Present" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Present"))" style="cursor:pointer;">
+            <div class="hero-stat-icon">
+                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+            <div class="hero-stat-value" style="color: rgba(255,255,255,0.95);">@PresentCount</div>
+            <div class="hero-stat-label">Present</div>
+            <div class="hero-stat-change">Employees present today</div>
         </div>
-        <div class="summary-card @(SelectedFilter == "Absent" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Absent"))" style="cursor:pointer;">
-            <div class="summary-label">ABSENT</div>
-            <div class="summary-value" style="color: #991b1b;">@AbsentCount</div>
-            <div class="summary-desc">Employees absent today</div>
+        <div class="hero-stat @(SelectedFilter == "Absent" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Absent"))" style="cursor:pointer;">
+            <div class="hero-stat-icon">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </div>
+            <div class="hero-stat-value" style="color: rgba(255,255,255,0.95);">@AbsentCount</div>
+            <div class="hero-stat-label">Absent</div>
+            <div class="hero-stat-change">Employees absent today</div>
         </div>
-        <div class="summary-card @(SelectedFilter == "OnLeave" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("OnLeave"))" style="cursor:pointer;">
-            <div class="summary-label">ON LEAVE</div>
-            <div class="summary-value" style="color: #d97706;">@OnLeaveCount</div>
-            <div class="summary-desc">Employees on leave</div>
+        <div class="hero-stat @(SelectedFilter == "OnLeave" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("OnLeave"))" style="cursor:pointer;">
+            <div class="hero-stat-icon">
+                <svg viewBox="0 0 24 24"><path d="M7 11h2v2H7zm0 4h2v2H7zm4-4h2v2h-2zm0 4h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2z"/><path d="M5 22h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2zm0-2V10h14v10H5z" fill-rule="evenodd"/></svg>
+            </div>
+            <div class="hero-stat-value" style="color: rgba(255,255,255,0.95);">@OnLeaveCount</div>
+            <div class="hero-stat-label">On Leave</div>
+            <div class="hero-stat-change">Employees on leave</div>
         </div>
-        <div class="summary-card @(SelectedFilter == "Late" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Late"))" style="cursor:pointer;">
-            <div class="summary-label">LATE</div>
-            <div class="summary-value" style="color: #b91c1c;">@LateCount</div>
-            <div class="summary-desc">Employees late today</div>
+        <div class="hero-stat @(SelectedFilter == "Late" ? "summary-card-active" : "")" @onclick="@(() => SetFilter("Late"))" style="cursor:pointer;">
+            <div class="hero-stat-icon">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            </div>
+            <div class="hero-stat-value" style="color: rgba(255,255,255,0.95);">@LateCount</div>
+            <div class="hero-stat-label">Late</div>
+            <div class="hero-stat-change">Employees late today</div>
         </div>
     </div>
 
@@ -45,10 +58,21 @@
         <div class="toolbar-left">
             <div class="toolbar-search">
                 <input type="text" placeholder="Search by name or ID..." @bind="SearchText" @oninput="OnSearchChanged" />
-                <span class="search-icon"></span>
             </div>
-            <input type="date" class="filter-select" value="@SelectedDate.ToString("yyyy-MM-dd")"
-                   style="padding: 10px 16px;" @onchange="OnDateChanged" />
+
+            <select class="filter-select" value="@SelectedRange" @onchange="OnRangeChanged">
+                <option value="Today">Today</option>
+                <option value="Week">This Week</option>
+                <option value="Month">This Month</option>
+                <option value="Year">This Year</option>
+                <option value="Custom">Custom</option>
+            </select>
+            <span class="range-note">@RangeLabel</span>
+
+            <input type="date" class="filter-select" value="@StartDate.ToString("yyyy-MM-dd")"
+                   style="padding: 10px 16px;" @onchange="OnStartDateChanged" />
+            <input type="date" class="filter-select" value="@EndDate.ToString("yyyy-MM-dd")"
+                   style="padding: 10px 16px;" @onchange="OnEndDateChanged" />
         </div>
         <div>
             <button class="btn-primary" @onclick="LoadToday">Today</button>
@@ -71,7 +95,7 @@
     else if (HasError)
     {
         <div class="error-message">
-            <h4>⚠️ Database Error</h4>
+            <h4><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> Database Error</h4>
             <p>@ErrorMessage</p>
             <button class="btn-primary" style="margin-top:15px;" @onclick="RetryLoad">Retry</button>
         </div>
@@ -97,7 +121,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var emp in FilteredEmployees)
+                            @foreach (var emp in PaginatedEmployees)
                             {
                                 var schedule = Schedules.FirstOrDefault(s => s.EmployeeId == emp.EmployeeId);
                                 var attendance = schedule != null
@@ -180,7 +204,7 @@
                                         <div style="display:flex; justify-content:center; gap:8px;">
                                             <button class="btn-secondary" style="padding:6px 10px; background:#10b981; color:white;"
                                                     @onclick="() => OpenShiftModal(emp, schedule)">
-                                                @(schedule != null ? "Edit" : "➕")
+                                                @(schedule != null ? "Edit" : "+")
                                             </button>
                                             <button class="btn-secondary" style="padding:6px 10px; background:#64748b; color:white;"
                                                     @onclick="() => ViewHistory(emp.EmployeeId)">
@@ -192,6 +216,15 @@
                             }
                         </tbody>
                     </table>
+                    
+                    @if (FilteredEmployees.Count > 0)
+                    {
+                        <Pagination CurrentPage="@CurrentPage" 
+                                    TotalItems="@FilteredEmployees.Count" 
+                                    ItemsPerPage="@ItemsPerPage"
+                                    OnPageChanged="@OnPageChanged"
+                                    OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                    }
                 }
                 else
                 {
@@ -223,9 +256,9 @@
                     <label class="form-label">Shift Type</label>
                     <select class="form-input" @bind="SelectedShiftType" @bind:after="OnShiftTypeChanged">
                         <option value="">-- Select Shift Type --</option>
-                        <option value="Day">🌅 Day Shift (5:00 AM - 5:00 PM)</option>
-                        <option value="Night">🌙 Night Shift (5:00 PM - 5:00 AM)</option>
-                        <option value="Custom">⚙️ Custom Schedule</option>
+                        <option value="Day">Day Shift (5:00 AM - 5:00 PM)</option>
+                        <option value="Night">Night Shift (5:00 PM - 5:00 AM)</option>
+                        <option value="Custom">Custom Schedule</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -291,7 +324,7 @@
                                     <td>@(record.ActualCheckOut?.ToString("hh:mm tt") ?? "--:--")</td>
                                     <td style="font-weight:700; color:#10b981;">@((record.RegularHours ?? 0 + record.OvertimeHours ?? 0).ToString("F1"))h</td>
                                     <td>
-                                        <span class="badge-@record.AttendanceStatus.ToLower().Replace(" ", "-")">@record.AttendanceStatus</span>
+                                        <span class="badge-@(record.AttendanceStatus?.ToLower().Replace(" ", "-") ?? "unknown")">@(record.AttendanceStatus ?? "Unknown")</span>
                                     </td>
                                 </tr>
                             }
@@ -361,6 +394,11 @@
         margin-top: auto;
     }
 
+    .range-note {
+        font-size: 0.9rem;
+        color: #475569;
+    }
+
     .summary-card-active {
         border: 2px solid #0f766e;
         background: #f0fdfa;
@@ -411,6 +449,9 @@
 
 @code {
     private string SearchText = "";
+    private string SelectedRange = "Today";
+    private DateTime StartDate = DateTime.Today;
+    private DateTime EndDate = DateTime.Today;
     private DateTime SelectedDate = DateTime.Today;
     private bool ShowShiftModal = false;
     private bool ShowHistoryModal = false;
@@ -419,6 +460,10 @@
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
     private string SelectedFilter = "";
+    
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
 
     private List<Employee> Employees = new();
     private List<Schedule> Schedules = new();
@@ -441,7 +486,12 @@
     private int OnLeaveCount = 0;
     private int LateCount = 0;
 
-    protected override async Task OnInitializedAsync() => await LoadData();
+    protected override async Task OnInitializedAsync()
+    {
+        UpdateRangeDates();
+        SelectedDate = EndDate;
+        await LoadData();
+    }
 
     private async Task LoadData()
     {
@@ -450,18 +500,19 @@
             HasError = false;
             ErrorMessage = string.Empty;
 
-            Employees = await Context.Employees
+            using var context = ContextFactory.CreateDbContext();
+            Employees = await context.Employees
                 .Include(e => e.Position).ThenInclude(p => p!.Department)
                 .Where(e => e.Status == "Active")
                 .AsNoTracking().OrderBy(e => e.FirstName).ToListAsync();
 
-            Schedules = await Context.Schedules
+            Schedules = await context.Schedules
                 .Where(s => s.ScheduleDate == DateOnly.FromDateTime(SelectedDate) && s.IsActive == true)
                 .AsNoTracking().ToListAsync();
 
             var scheduleIds = Schedules.Select(s => s.ScheduleId).ToList();
 
-            Attendances = await Context.Attendances
+            Attendances = await context.Attendances
                 .Where(a => a.AttendanceDate == DateOnly.FromDateTime(SelectedDate) && scheduleIds.Contains(a.ScheduleId))
                 .Include(a => a.Schedule).AsNoTracking().ToListAsync();
 
@@ -501,8 +552,17 @@
 
     private async Task RetryLoad() { IsLoaded = false; StateHasChanged(); await Task.Delay(500); await LoadData(); }
     private void OnSearchChanged(ChangeEventArgs e) => SearchText = e.Value?.ToString() ?? string.Empty;
-    private async Task OnDateChanged(ChangeEventArgs e) { if (DateTime.TryParse(e.Value?.ToString(), out var date)) { SelectedDate = date; await LoadData(); } }
-    private async Task LoadToday() { SelectedDate = DateTime.Today; await LoadData(); }
+    private async Task OnDateChanged(ChangeEventArgs e) { if (DateTime.TryParse(e.Value?.ToString(), out var date)) { SelectedDate = date; StartDate = date; EndDate = date; SelectedRange = "Custom"; await LoadData(); } }
+    private async Task OnStartDateChanged(ChangeEventArgs e) { if (DateTime.TryParse(e.Value?.ToString(), out var date)) { StartDate = date; if (StartDate > EndDate) EndDate = StartDate; SelectedRange = "Custom"; SelectedDate = EndDate; await LoadData(); } }
+    private async Task OnEndDateChanged(ChangeEventArgs e) { if (DateTime.TryParse(e.Value?.ToString(), out var date)) { EndDate = date; if (EndDate < StartDate) StartDate = EndDate; SelectedRange = "Custom"; SelectedDate = EndDate; await LoadData(); } }
+    private async Task OnRangeChanged(ChangeEventArgs e)
+    {
+        SelectedRange = e.Value?.ToString() ?? "Today";
+        UpdateRangeDates();
+        SelectedDate = EndDate;
+        await LoadData();
+    }
+    private async Task LoadToday() { SelectedRange = "Today"; UpdateRangeDates(); SelectedDate = EndDate; await LoadData(); }
 
     private List<Employee> FilteredEmployees
     {
@@ -546,6 +606,59 @@
             return list.OrderBy(e => e.FirstName).ToList();
         }
     }
+
+    private List<Employee> PaginatedEmployees => FilteredEmployees
+        .Skip((CurrentPage - 1) * ItemsPerPage)
+        .Take(ItemsPerPage)
+        .ToList();
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void UpdateRangeDates()
+    {
+        var today = DateTime.Today;
+        switch (SelectedRange)
+        {
+            case "Week":
+                EndDate = today;
+                StartDate = today.AddDays(-6);
+                break;
+            case "Month":
+                EndDate = today;
+                StartDate = new DateTime(today.Year, today.Month, 1);
+                break;
+            case "Year":
+                EndDate = today;
+                StartDate = new DateTime(today.Year, 1, 1);
+                break;
+            case "Today":
+                StartDate = today;
+                EndDate = today;
+                break;
+            default:
+                if (StartDate > EndDate)
+                {
+                    EndDate = StartDate;
+                }
+                SelectedRange = "Custom";
+                break;
+        }
+    }
+
+    private string RangeLabel => StartDate.Date == EndDate.Date
+        ? StartDate.ToString("dddd, MMM dd, yyyy")
+        : $"{StartDate:MMM dd, yyyy} - {EndDate:MMM dd, yyyy}";
 
     private void OpenShiftModal(Employee emp, Schedule? schedule)
     {
@@ -607,14 +720,15 @@
         if (SelectedEmployee == null || string.IsNullOrEmpty(SelectedShiftType)) return;
         try
         {
-            var existingSchedule = await Context.Schedules
+            using var context = ContextFactory.CreateDbContext();
+            var existingSchedule = await context.Schedules
                 .FirstOrDefaultAsync(s => s.EmployeeId == SelectedEmployee.EmployeeId && s.ScheduleDate == DateOnly.FromDateTime(ShiftDate) && s.IsActive == true);
 
             if (existingSchedule != null)
             {
                 existingSchedule.IsActive = false;
                 existingSchedule.UpdatedAt = DateTime.Now;
-                Context.Schedules.Update(existingSchedule);
+                context.Schedules.Update(existingSchedule);
             }
 
             var newSchedule = new Schedule
@@ -628,14 +742,14 @@
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
-            Context.Schedules.Add(newSchedule);
-            await Context.SaveChangesAsync();
+            context.Schedules.Add(newSchedule);
+            await context.SaveChangesAsync();
 
             if (existingSchedule != null)
             {
-                var attendancesToUpdate = await Context.Attendances.Where(a => a.ScheduleId == existingSchedule.ScheduleId).ToListAsync();
+                var attendancesToUpdate = await context.Attendances.Where(a => a.ScheduleId == existingSchedule.ScheduleId).ToListAsync();
                 foreach (var att in attendancesToUpdate) { att.ScheduleId = newSchedule.ScheduleId; att.UpdatedAt = DateTime.Now; }
-                await Context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
 
             await LoadData();
@@ -649,14 +763,15 @@
     {
         try
         {
-            var existingAttendance = await Context.Attendances.FirstOrDefaultAsync(a => a.ScheduleId == schedule.ScheduleId);
+            using var context = ContextFactory.CreateDbContext();
+            var existingAttendance = await context.Attendances.FirstOrDefaultAsync(a => a.ScheduleId == schedule.ScheduleId);
 
             if (existingAttendance != null)
             {
                 existingAttendance.ActualCheckIn = DateTime.Now;
                 existingAttendance.AttendanceStatus = "Present";
                 existingAttendance.UpdatedAt = DateTime.Now;
-                Context.Attendances.Update(existingAttendance);
+                context.Attendances.Update(existingAttendance);
             }
             else
             {
@@ -669,9 +784,9 @@
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
                 };
-                Context.Attendances.Add(newAttendance);
+                context.Attendances.Add(newAttendance);
             }
-            await Context.SaveChangesAsync();
+            await context.SaveChangesAsync();
             await LoadData();
             await JSRuntime.InvokeVoidAsync("alert", $"{emp.FirstName} checked in successfully");
         }
@@ -682,7 +797,8 @@
     {
         try
         {
-            var existing = await Context.Attendances.FindAsync(attendance.AttendanceId);
+            using var context = ContextFactory.CreateDbContext();
+            var existing = await context.Attendances.FindAsync(attendance.AttendanceId);
             if (existing != null)
             {
                 existing.ActualCheckOut = DateTime.Now;
@@ -693,8 +809,8 @@
                     existing.OvertimeHours = (decimal)Math.Max(hours - 8, 0);
                 }
                 existing.UpdatedAt = DateTime.Now;
-                Context.Attendances.Update(existing);
-                await Context.SaveChangesAsync();
+                context.Attendances.Update(existing);
+                await context.SaveChangesAsync();
                 await LoadData();
                 await JSRuntime.InvokeVoidAsync("alert", "Check-out recorded");
             }
@@ -709,8 +825,9 @@
             var emp = Employees.FirstOrDefault(e => e.EmployeeId == employeeId);
             if (emp == null) return;
             HistoryEmployeeName = $"{emp.FirstName} {emp.LastName}";
-            var scheduleIds = await Context.Schedules.Where(s => s.EmployeeId == employeeId).Select(s => s.ScheduleId).ToListAsync();
-            HistoryRecords = await Context.Attendances
+            using var context = ContextFactory.CreateDbContext();
+            var scheduleIds = await context.Schedules.Where(s => s.EmployeeId == employeeId).Select(s => s.ScheduleId).ToListAsync();
+            HistoryRecords = await context.Attendances
                 .Where(a => scheduleIds.Contains(a.ScheduleId))
                 .Include(a => a.Schedule)
                 .OrderByDescending(a => a.AttendanceDate).Take(30).AsNoTracking().ToListAsync();
@@ -721,6 +838,6 @@
 
     private void CloseHistoryModal() { ShowHistoryModal = false; HistoryRecords = new(); }
     private string FormatTime(TimeOnly time) => DateTime.Today.Add(time.ToTimeSpan()).ToString("hh:mm tt");
-    private string GetStatusText(AttendanceRecord? attendance, Schedule? schedule) => attendance != null ? attendance.AttendanceStatus : (schedule != null ? "Pending" : "No Shift");
-    private string GetStatusClass(AttendanceRecord? attendance, Schedule? schedule) => attendance != null ? attendance.AttendanceStatus.ToLower().Replace(" ", "-") : (schedule != null ? "pending" : "no-shift");
+    private string GetStatusText(AttendanceRecord? attendance, Schedule? schedule) => attendance?.AttendanceStatus ?? (schedule != null ? "Pending" : "No Shift");
+    private string GetStatusClass(AttendanceRecord? attendance, Schedule? schedule) => (attendance?.AttendanceStatus?.ToLower().Replace(" ", "-") ?? (schedule != null ? "pending" : "no-shift")) ?? "no-shift";
 }

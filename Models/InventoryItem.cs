@@ -6,6 +6,7 @@ namespace HestiaLink.Models
     public class InventoryItem
     {
         [Key]
+        [Column("ItemID")]
         public int ItemId { get; set; }
 
         [Required]
@@ -42,6 +43,7 @@ namespace HestiaLink.Models
         public virtual Supplier? Supplier { get; set; }
         
         // Service Category relationship (for service-based inventory deduction)
+        [Column("ServiceCategoryID")]
         public int? ServiceCategoryId { get; set; }
 
         [ForeignKey("ServiceCategoryId")]

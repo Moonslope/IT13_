@@ -1,8 +1,12 @@
-﻿@page "/housekeeping/room-status"
+@page "/housekeeping/room-status"
 @using HestiaLink.Data
 @using HestiaLink.Models
+@using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@using System.Linq
+@using Room = HestiaLink.Models.Room
+@inject IDbContextFactory<HestiaLink.Data.HestiaLinkContext> DbFactory
+@inject HousekeepingService HousekeepingService
 @inject NavigationManager Navigation
 
 <div class="page-wrapper">
@@ -19,13 +23,13 @@
         <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px;">
             <div style="display:flex; gap:12px; align-items:center;">
                 <div class="search-box" style="width: 320px;">
-                    <span class="search-icon">🔍</span>
                     <input placeholder="Search Room..." @bind="SearchTerm" @bind:event="oninput" />
                 </div>
                 <select class="filter-select" @bind="FilterStatus" style="width: 200px;">
                     <option value="">All Statuses</option>
                     <option value="Available">Available</option>
                     <option value="Occupied">Occupied</option>
+                    <option value="For Cleaning">For Cleaning</option>
                     <option value="Dirty">Dirty</option>
                     <option value="Maintenance">Maintenance</option>
                 </select>
@@ -50,7 +54,7 @@
             }
             else
             {
-                @foreach (var room in FilteredRooms)
+                @foreach (var room in PaginatedRooms)
                 {
                     <div class="user-card">
                         <div class="card-top" style="margin-bottom:12px;">
@@ -58,7 +62,7 @@
                                 Room @room.RoomNumber <span style="font-weight:400; color:#64748b; font-size:0.95rem;">(Floor @room.Floor)</span>
                             </div>
                             <div class="status-badge @GetStatusBadgeClass(room.Status)">
-                                @room.Status.ToUpper()
+                                @(room.Status?.ToUpper() ?? "UNKNOWN")
                             </div>
                         </div>
 
@@ -81,7 +85,7 @@
                             }
                             else if (room.Status == "Available")
                             {
-                                <button class="btn-secondary" style="flex:1; padding: 8px; font-size: 0.85rem;" @onclick="() => MarkDirty(room)">Mark Dirty</button>
+                                <button class="btn-secondary" style="flex:1; padding: 8px; font-size: 0.85rem;" @onclick="() => MarkForCleaning(room)">Mark For Cleaning</button>
                                 <button class="btn-secondary" style="flex:1; padding: 8px; font-size: 0.85rem;" @onclick="() => MarkMaintenance(room)">Maint.</button>
                             }
                             else if (room.Status == "Maintenance")
@@ -99,17 +103,44 @@
                 }
             }
         </div>
+        
+        <Pagination CurrentPage="@CurrentPage" 
+                    TotalItems="@FilteredRooms.ToList().Count" 
+                    ItemsPerPage="@ItemsPerPage"
+                    OnPageChanged="@OnPageChanged"
+                    OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
     </div>
 </div>
 
 @code {
-    private List<Room> Rooms = new();
+    private List<HestiaLink.Models.Room> Rooms = new();
     private string SearchTerm = "";
     private string FilterStatus = "";
+    
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 12;
 
-    private IEnumerable<Room> FilteredRooms => Rooms
+    private IEnumerable<HestiaLink.Models.Room> FilteredRooms => Rooms
         .Where(r => string.IsNullOrEmpty(SearchTerm) || r.RoomNumber.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase))
         .Where(r => string.IsNullOrEmpty(FilterStatus) || r.Status == FilterStatus);
+
+    private IEnumerable<HestiaLink.Models.Room> PaginatedRooms => FilteredRooms
+        .Skip((CurrentPage - 1) * ItemsPerPage)
+        .Take(ItemsPerPage);
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,24 +149,37 @@
 
     private async Task LoadRooms()
     {
-        Rooms = await DbContext.Rooms.Include(r => r.RoomType).ToListAsync();
+        using var context = await DbFactory.CreateDbContextAsync();
+        Rooms = await context.Rooms
+            .AsNoTracking()
+            .Include(r => r.RoomType)
+            .ToListAsync();
     }
 
     private async Task UpdateStatus(Room room, string newStatus)
     {
-        room.Status = newStatus;
-        DbContext.Rooms.Update(room);
-        await DbContext.SaveChangesAsync();
-        // Refresh local list if needed, or just let UI update since it's bound
+        if (room == null) return;
+
+        // Use centralized service update to avoid tracking conflicts
+        var success = await HousekeepingService.UpdateRoomStatusAsync(room.RoomID, newStatus);
+
+        if (success)
+        {
+            room.Status = newStatus; // update bound model for immediate UI feedback
+        }
+        else
+        {
+            await LoadRooms(); // fallback refresh if update failed
+        }
     }
 
     private async Task MarkAvailable(Room room) => await UpdateStatus(room, "Available");
-    private async Task MarkDirty(Room room) => await UpdateStatus(room, "Dirty");
+    private async Task MarkForCleaning(Room room) => await UpdateStatus(room, "For Cleaning");
     private async Task MarkMaintenance(Room room) => await UpdateStatus(room, "Maintenance");
 
-    private string GetStatusBadgeClass(string status)
+    private string GetStatusBadgeClass(string? status)
     {
-        return status?.ToLower() switch
+        return (status ?? "available").ToLower() switch
         {
             "available" => "badge-available",
             "occupied" => "badge-occupied",

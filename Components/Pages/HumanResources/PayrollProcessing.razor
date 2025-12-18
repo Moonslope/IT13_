@@ -17,27 +17,39 @@
     </header>
 
     <section class="page-content">
-        <!-- Summary Cards -->
-        <div class="summary-cards">
-            <div class="summary-card">
-                <div class="summary-label">TOTAL INCOME</div>
-                <div class="summary-value">₱@TotalIncome.ToString("N2")</div>
-                <div class="summary-desc">From all completed payments</div>
+        <!-- Summary Cards - Dashboard Style -->
+        <div class="dashboard-hero" style="margin-bottom:32px;">
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z" fill="white"/></svg>
+                </div>
+                <div class="hero-stat-value">₱@TotalIncome.ToString("N2")</div>
+                <div class="hero-stat-label">Total Income</div>
+                <div class="hero-stat-change">From all completed payments</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">ACTIVE EMPLOYEES</div>
-                <div class="summary-value">@TotalEmployees</div>
-                <div class="summary-desc">Currently employed</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                </div>
+                <div class="hero-stat-value">@TotalEmployees</div>
+                <div class="hero-stat-label">Active Employees</div>
+                <div class="hero-stat-change">Currently employed</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">TOTAL PAYMENTS</div>
-                <div class="summary-value">₱@TotalEmployeePayments.ToString("N2")</div>
-                <div class="summary-desc">Gross payroll amount</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                </div>
+                <div class="hero-stat-value">₱@TotalEmployeePayments.ToString("N2")</div>
+                <div class="hero-stat-label">Total Payments</div>
+                <div class="hero-stat-change">Gross payroll amount</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">TOTAL TAXES</div>
-                <div class="summary-value">₱@TotalTaxesDeducted.ToString("N2")</div>
-                <div class="summary-desc">Tax deductions</div>
+            <div class="hero-stat">
+                <div class="hero-stat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </div>
+                <div class="hero-stat-value">₱@TotalTaxesDeducted.ToString("N2")</div>
+                <div class="hero-stat-label">Total Taxes</div>
+                <div class="hero-stat-change">Tax deductions</div>
             </div>
         </div>
 
@@ -63,8 +75,8 @@
                         }
                     </select>
                 </div>
-                <button class="btn-secondary" style="background: #f59e0b; color: white;" @onclick="OpenTaxModal">⚙️ Manage Taxes</button>
-                <button class="btn-primary" @onclick="LoadPayrollData">🔄 Load Payroll</button>
+                <button class="btn-secondary" style="background: #f59e0b; color: white;" @onclick="OpenTaxModal"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg> Manage Taxes</button>
+                <button class="btn-primary" @onclick="LoadPayrollData"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg> Load Payroll</button>
             </div>
         </div>
 
@@ -75,7 +87,7 @@
         else if (HasError)
         {
             <div class="error-message">
-                <h4>⚠️ Database Error</h4>
+                <h4><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> Database Error</h4>
                 <p>@ErrorMessage</p>
                 <button class="btn-primary" style="margin-top:15px;" @onclick="RetryLoad">Retry</button>
             </div>
@@ -97,25 +109,25 @@
                                     <th>Employee ID</th>
                                     <th>Employee Name</th>
                                     <th>Position</th>
-                                    <th>Monthly Salary</th>
+                                    <th style="text-align:right;">Monthly Salary</th>
                                     <th>Total Hours</th>
-                                    <th>Hourly Rate</th>
-                                    <th>Total Salary</th>
+                                    <th style="text-align:right;">Hourly Rate</th>
+                                    <th style="text-align:right;">Total Salary</th>
                                     <th>Payment Status</th>
                                     <th style="text-align:center;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var employee in FilteredPayrollSummary)
+                                @foreach (var employee in PagedPayrollSummary)
                                 {
                                     <tr style="cursor: pointer;" @onclick="@(() => OpenEmployeePaymentModal(employee))">
                                         <td style="font-family: monospace; font-weight: 700;">@employee.EmployeeId</td>
                                         <td style="font-weight: 700;">@employee.EmployeeName</td>
                                         <td>@employee.PositionTitle</td>
-                                        <td>₱@employee.MonthlySalary?.ToString("N2")</td>
+                                        <td style="text-align:right;">₱@employee.MonthlySalary?.ToString("N2")</td>
                                         <td style="text-align: center; font-weight: 600;">@employee.TotalHours?.ToString("N1")</td>
-                                        <td>₱@employee.HourlyRate?.ToString("N2")</td>
-                                        <td style="font-weight: 900; color: var(--color-teal);">₱@employee.TotalSalary?.ToString("N2")</td>
+                                        <td style="text-align:right;">₱@employee.HourlyRate?.ToString("N2")</td>
+                                        <td style="font-weight: 900; color: var(--color-teal); text-align:right;">₱@employee.TotalSalary?.ToString("N2")</td>
                                         <td>
                                             <span class="status-badge @GetPaymentStatusClass(employee.PaymentStatus)">
                                                 @employee.PaymentStatus
@@ -125,13 +137,20 @@
                                             <button class="btn-secondary" style="padding: 6px 12px;"
                                                     @onclick:stopPropagation="true"
                                                     @onclick="@(() => OpenEmployeePaymentModal(employee))">
-                                                💰 Update
+                                                <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg> Update
                                             </button>
                                         </td>
                                     </tr>
                                 }
                             </tbody>
                         </table>
+
+                        <Pagination 
+                            CurrentPage="@CurrentPage"
+                            TotalItems="@FilteredPayrollSummary.Count"
+                            ItemsPerPage="@ItemsPerPage"
+                            OnPageChanged="@HandlePageChanged"
+                            OnItemsPerPageChangedCallback="@HandleItemsPerPageChanged" />
                     }
                     else
                     {
@@ -156,7 +175,7 @@
                 <!-- Left Side: Add New Tax Form -->
                 <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; height: fit-content;">
                     <h3 style="margin-top: 0; color: var(--color-dark-teal); font-weight: 900; font-size: 1.1rem; margin-bottom: 20px;">
-                        <span style="background: var(--color-teal); color: white; padding: 4px 8px; border-radius: 6px; margin-right: 8px;">➕</span>
+                        <span style="background: var(--color-teal); color: white; padding: 4px 8px; border-radius: 6px; margin-right: 8px;">+</span>
                         Add New Tax Rate
                     </h3>
 
@@ -184,11 +203,11 @@
 
                     <button class="btn-primary" style="width: 100%; padding: 12px; font-weight: 700;"
                             @onclick="AddNewTax">
-                        <span style="margin-right: 8px;">✅</span> Add Tax Rate
+                        <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Add Tax Rate
                     </button>
 
                     <div style="margin-top: 16px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
-                        <div style="font-size: 0.85rem; color: #0369a1; font-weight: 600;">💡 Tip</div>
+                        <div style="font-size: 0.85rem; color: #0369a1; font-weight: 600;">Tip</div>
                         <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
                             Add tax rates that will be automatically applied to payroll calculations.
                         </div>
@@ -199,7 +218,7 @@
                 <div>
                     <div style="margin-bottom: 16px;">
                         <h3 style="margin: 0; color: var(--color-dark-teal); font-weight: 900; font-size: 1.1rem;">
-                            <span style="background: var(--color-teal); color: white; padding: 4px 8px; border-radius: 6px; margin-right: 8px;">📊</span>
+                            <span style="background: var(--color-teal); color: white; padding: 4px 8px; border-radius: 6px; margin-right: 8px;"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg></span>
                             Current Tax Rates
                         </h3>
                         <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
@@ -233,7 +252,7 @@
                                                 }
                                             </td>
                                             <td style="padding: 12px 16px;">
-                                                <span class="status-badge" style="background: #fee2e2; color: #991b1b; padding: 6px 12px; font-weight: 700;">
+                                                <span class="status-badge" style="color: #991b1b; padding: 6px 12px; font-weight: 700;">
                                                     @tax.TaxPercentage.ToString("N1")%
                                                 </span>
                                             </td>
@@ -242,11 +261,11 @@
                                                       style="padding: 6px 12px;">
                                                     @if (tax.Status == "Active")
                                                     {
-                                                        <span style="margin-right: 4px;">✅</span>
+                                                        <svg class="icon-inline-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                                                     }
                                                     else
                                                     {
-                                                        <span style="margin-right: 4px;">📁</span>
+                                                        <svg class="icon-inline-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg>
                                                     }
                                                     @tax.Status
                                                 </span>
@@ -257,12 +276,12 @@
                                                         @onclick="@(() => ToggleTaxStatus(tax))">
                                                     @if (tax.Status == "Active")
                                                     {
-                                                        <span style="margin-right: 4px;">📁</span>
+                                                        <svg class="icon-inline-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg>
                                                         @:Archive
                                                     }
                                                     else
                                                     {
-                                                        <span style="margin-right: 4px;">↩️</span>
+                                                        <svg class="icon-inline-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
                                                         @:Restore
                                                     }
                                                 </button>
@@ -275,7 +294,7 @@
                         else
                         {
                             <div class="no-data" style="padding: 40px 20px; text-align: center;">
-                                <div style="font-size: 3rem; color: #e2e8f0; margin-bottom: 16px;">📊</div>
+                                <div style="font-size: 3rem; color: #e2e8f0; margin-bottom: 16px;"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg></div>
                                 <div style="font-weight: 700; color: #64748b; margin-bottom: 8px;">No tax rates configured</div>
                                 <div style="color: #94a3b8; font-size: 0.9rem;">Add your first tax rate using the form on the left</div>
                             </div>
@@ -340,10 +359,10 @@
                 <div class="form-group">
                     <label class="form-label">Payment Status</label>
                     <select class="form-select" @bind="SelectedPaymentStatus">
-                        <option value="Pending">⏳ Pending</option>
-                        <option value="Processing">🔄 Processing</option>
-                        <option value="Paid">✅ Paid</option>
-                        <option value="On Hold">⏸️ On Hold</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Paid">Paid</option>
+                        <option value="On Hold">On Hold</option>
                     </select>
                 </div>
 
@@ -510,6 +529,8 @@
     private string SelectedPaymentStatus = "Pending";
     private string SelectedPeriod = "2025-01-01";
     private int DepartmentFilter = 0;
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
     private bool ShowTaxModal = false;
     private bool ShowEmployeePaymentModal = false;
     private bool IsLoaded = false;
@@ -526,6 +547,10 @@
         DepartmentFilter == 0
             ? EmployeePayrollSummary
             : EmployeePayrollSummary.Where(e => e.DepartmentId == DepartmentFilter).ToList();
+
+    private IEnumerable<VwEmployeePayrollSummary> PagedPayrollSummary => FilteredPayrollSummary
+        .Skip((CurrentPage - 1) * ItemsPerPage)
+        .Take(ItemsPerPage);
 
     protected override async Task OnInitializedAsync()
     {
@@ -565,6 +590,8 @@
 
             // Calculate summary totals
             await CalculateSummaryTotals();
+
+            CurrentPage = 1; // reset pagination after data refresh
 
             IsLoaded = true;
         }
@@ -620,6 +647,21 @@
         StateHasChanged();
         await Task.Delay(300);
         await LoadData();
+    }
+
+    private Task HandlePageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task HandleItemsPerPageChanged(int newSize)
+    {
+        ItemsPerPage = newSize;
+        CurrentPage = 1;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task RetryLoad()

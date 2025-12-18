@@ -25,6 +25,10 @@ public static class MauiProgram
         // Add DbContext with SQL Server connection
         builder.Services.AddDbContext<HestiaLinkContext>(options =>
             options.UseSqlServer(GetConnectionString()));
+        
+        // Register DbContextFactory for components to avoid threading issues
+        builder.Services.AddDbContextFactory<HestiaLinkContext>(options =>
+            options.UseSqlServer(GetConnectionString()));
 
         return builder;
     }
@@ -37,6 +41,6 @@ public static class MauiProgram
             .Build();
 
         return config.GetConnectionString("DefaultConnection") 
-            ?? "Data Source=.\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
+            ?? "Data Source=JESTER-PC\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False";
     }
 }

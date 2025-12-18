@@ -2,7 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @inject HestiaLinkContext Context
 @inject IJSRuntime JSRuntime
-@layout MainLayout
+@layout HestiaIT13Final.Components.Layout.MainLayout
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -564,7 +564,7 @@
                 RoomTypes = await Context.RoomTypes.AsNoTracking().OrderBy(rt => rt.TypeName).ToListAsync();
                 Rooms = await Context.Rooms.AsNoTracking().OrderBy(r => r.Floor).ThenBy(r => r.RoomNumber).ToListAsync();
 
-                Floors = Rooms.Where(r => r.Floor.HasValue).Select(r => r.Floor.Value).Distinct().OrderBy(f => f).Select(f => new Floor { FloorNumber = f }).ToList();
+                Floors = Rooms.Where(r => r.Floor.HasValue).Select(r => r.Floor.GetValueOrDefault()).Distinct().OrderBy(f => f).Select(f => new Floor { FloorNumber = f }).ToList();
                 if (!Floors.Any()) Floors = new List<Floor> { new Floor { FloorNumber = 1 }, new Floor { FloorNumber = 2 } };
                 return;
             }
@@ -588,7 +588,7 @@
         };
     }
 
-    private string GetRoomStatusClass(string status) => status?.ToLower() switch
+    private string GetRoomStatusClass(string? status) => (status ?? "available").ToLower() switch
     {
         "available" => "available",
         "occupied" => "occupied",

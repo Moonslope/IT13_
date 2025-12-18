@@ -3,12 +3,11 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@inject IDbContextFactory<HestiaLinkContext> DbFactory
 @inject NavigationManager Navigation
 @inject UserSession UserSession
 @inject IJSRuntime JSRuntime
 @inject HousekeepingService HousekeepingService
-@layout MainLayout
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -21,144 +20,202 @@
     <section class="page-content">
         @if (!IsLoaded)
         {
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <p>Loading dashboard data...</p>
+            <div class="skeleton-wrapper">
+                <div class="skeleton-grid">
+                    @for (int i = 0; i < 9; i++)
+                    {
+                        <div class="skeleton-card"></div>
+                    }
+                </div>
+                <div class="skeleton-charts">
+                    <div class="skeleton-chart"></div>
+                    <div class="skeleton-chart"></div>
+                    <div class="skeleton-chart"></div>
+                </div>
             </div>
         }
         else if (HasError)
         {
             <div style="padding:12px; border-radius:8px; background:#fff4f8; color:#7f1d1d; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                <span>⚠️ @ErrorMessage</span>
-                <button class="btn-create" @onclick="LoadDashboardData">🔄 Retry</button>
+                <span><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> @ErrorMessage</span>
+                <button class="btn-create" @onclick="LoadDashboardData"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg> Retry</button>
             </div>
         }
         else
         {
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-label">AVAILABLE ROOMS</div>
-                    <div class="summary-value">@AvailableRooms</div>
-                    <div class="summary-desc">of @TotalRooms total</div>
+            <!-- Hero Stats Section -->
+            <div class="dashboard-hero">
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-7-2h2V7h-4v2h2z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@AvailableRooms</div>
+                    <div class="hero-stat-label">Available Rooms</div>
+                    <div class="hero-stat-change">
+                        @if (AvailableRooms > YesterdayAvailableRooms)
+                        {
+                            <span style="color: #6ee7b7;">↑ @(AvailableRooms - YesterdayAvailableRooms)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (AvailableRooms < YesterdayAvailableRooms)
+                        {
+                            <span style="color: #fca5a5;">↓ @(YesterdayAvailableRooms - AvailableRooms)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>No change vs yesterday</span>
+                        }
+                    </div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">ACTIVE GUESTS</div>
-                    <div class="summary-value">@ActiveGuests</div>
-                    <div class="summary-desc">checked in now</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@ActiveGuests</div>
+                    <div class="hero-stat-label">Active Guests</div>
+                    <div class="hero-stat-change">
+                         @if (ActiveGuests > YesterdayActiveGuests)
+                        {
+                            <span style="color: #6ee7b7;">↑ @(ActiveGuests - YesterdayActiveGuests)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (ActiveGuests < YesterdayActiveGuests)
+                        {
+                            <span style="color: #fca5a5;">↓ @(YesterdayActiveGuests - ActiveGuests)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>Same as yesterday</span>
+                        }
+                    </div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">PENDING TASKS</div>
-                    <div class="summary-value">@PendingHousekeepingTasks</div>
-                    <div class="summary-desc">housekeeping</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">₱@TotalOutstanding.ToString("N0")</div>
+                    <div class="hero-stat-label">Outstanding Balance</div>
+                    <div class="hero-stat-change">unpaid invoices</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">OUTSTANDING BALANCE</div>
-                    <div class="summary-value">₱@TotalOutstanding.ToString("N2")</div>
-                    <div class="summary-desc">unpaid invoices</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@OccupancyRate%</div>
+                    <div class="hero-stat-label">Occupancy Rate</div>
+                     <div class="hero-stat-change">
+                        @if (OccupancyRate > YesterdayOccupancyRate)
+                        {
+                            <span style="color: #6ee7b7;">↑ @((OccupancyRate - YesterdayOccupancyRate).ToString("0.0"))%</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (OccupancyRate < YesterdayOccupancyRate)
+                        {
+                            <span style="color: #fca5a5;">↓ @((YesterdayOccupancyRate - OccupancyRate).ToString("0.0"))%</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>Same as yesterday</span>
+                        }
+                    </div>
                 </div>
             </div>
 
-            <!-- Employee Cards -->
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-label">TOTAL EMPLOYEES</div>
-                    <div class="summary-value">@TotalEmployees</div>
-                    <div class="summary-desc">Active staff members</div>
+            <!-- Quick Stats Row -->
+            <div class="quick-stats-row">
+                <div class="quick-stat border-green">
+                    <div class="quick-stat-value">@PresentEmployees</div>
+                    <div class="quick-stat-label">Present</div>
+                    <div class="quick-stat-desc">employees today</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">PRESENT</div>
-                    <div class="summary-value" style="color:#10b981;">@PresentEmployees</div>
-                    <div class="summary-desc">Employees present today</div>
+                <div class="quick-stat border-amber">
+                    <div class="quick-stat-value">@LateEmployees</div>
+                    <div class="quick-stat-label">Late</div>
+                    <div class="quick-stat-desc">marked late</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">LATE</div>
-                    <div class="summary-value" style="color:#f97316;">@LateEmployees</div>
-                    <div class="summary-desc">Employees late today</div>
+                <div class="quick-stat border-red">
+                    <div class="quick-stat-value">@AbsentEmployees</div>
+                    <div class="quick-stat-label">Absent</div>
+                    <div class="quick-stat-desc">not present</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">ABSENT</div>
-                    <div class="summary-value" style="color:#ef4444;">@AbsentEmployees</div>
-                    <div class="summary-desc">Employees absent today</div>
+                <div class="quick-stat border-blue">
+                    <div class="quick-stat-value">@RoomsForCleaning</div>
+                    <div class="quick-stat-label">Needs Cleaning</div>
+                    <div class="quick-stat-desc">rooms pending</div>
+                </div>
+                <div class="quick-stat border-purple">
+                    <div class="quick-stat-value">@ActiveCleaningTasks</div>
+                    <div class="quick-stat-label">Active Tasks</div>
+                    <div class="quick-stat-desc">in progress</div>
+                </div>
+                <div class="quick-stat">
+                    <div class="quick-stat-value">@TotalEmployees</div>
+                    <div class="quick-stat-label">Total Staff</div>
+                    <div class="quick-stat-desc">active employees</div>
                 </div>
             </div>
 
-            <!-- Cleaning Schedule Cards -->
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-label">NEEDS CLEANING</div>
-                    <div class="summary-value">@RoomsForCleaning</div>
-                    <div class="summary-desc">Rooms requiring cleaning</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">ACTIVE TASKS</div>
-                    <div class="summary-value">@ActiveCleaningTasks</div>
-                    <div class="summary-desc">Currently in progress</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">AVAILABLE STAFF</div>
-                    <div class="summary-value">@AvailableHousekeepers</div>
-                    <div class="summary-desc">Housekeepers available</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">MAINTENANCE</div>
-                    <div class="summary-value">@MaintenanceRooms</div>
-                    <div class="summary-desc">Rooms under maintenance</div>
+            <!-- Date Filter -->
+            <div class="dashboard-filters">
+                <div class="filter-group">
+                    <label>Date Range</label>
+                    <select value="@SelectedRange" @onchange="OnRangeChanged">
+                        <option value="Today">Today</option>
+                        <option value="Week">This Week</option>
+                        <option value="Month">This Month</option>
+                        <option value="Year">This Year</option>
+                    </select>
+                    <span class="range-note">@RangeLabel</span>
                 </div>
             </div>
 
             <!-- Charts Section -->
-            <div class="charts-grid">
+            <div class="charts-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px;">
                 <!-- Check-In Chart -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>📅 Daily Check-Ins (Last 7 Days)</h3>
+                <div class="premium-card">
+                    <div class="premium-card-header">
+                        <h3 class="premium-card-title">
+                            <span class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+                            </span>
+                            Daily Check-Ins
+                        </h3>
+                        <span class="range-note">@(RangeStart.Date == RangeEnd.Date ? RangeStart.ToString("MMM dd") : $"{RangeStart:MMM dd} - {RangeEnd:MMM dd}")</span>
                     </div>
-                    <div class="chart-body">
-                        <canvas id="checkInChart"></canvas>
+                    <div class="premium-card-body">
+                        @if (DailyCheckIns.Any())
+                        {
+                            <div class="chart-container">
+                                <canvas id="checkInChart"></canvas>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="empty-state-premium">
+                                <div class="empty-state-icon">
+                                    <svg viewBox="0 0 24 24"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+                                </div>
+                                <div class="empty-state-title">No Check-Ins Yet</div>
+                                <div class="empty-state-desc">Check-in data will appear here once guests arrive.</div>
+                            </div>
+                        }
                     </div>
-                </div>
-
-                <!-- Inventory Chart -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>📦 Inventory by Category</h3>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="inventoryChart"></canvas>
-                    </div>
-                    @if (LowStockItems.Any())
+                    @if (RecentCheckInDetails.Any())
                     {
-                        <div class="chart-footer">
-                            <div class="restock-info">
-                                <h4>⚠️ Low Stock Items Needing Restock</h4>
-                                <table class="restock-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th>Current</th>
-                                            <th>Reorder Point</th>
-                                            <th>Suggested Qty</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var item in LowStockItems.Take(5))
-                                        {
-                                            var currentStock = item.CurrentStock ?? 0;
-                                            var reorderPoint = item.ReorderPoint ?? 0;
-                                            var suggestedQty = Math.Max(reorderPoint * 2 - currentStock, reorderPoint);
-                                            <tr>
-                                                <td style="font-weight:600;">@item.ItemName</td>
-                                                <td><span class="stock-badge critical">@currentStock</span></td>
-                                                <td>@reorderPoint</td>
-                                                <td style="color:#0f766e; font-weight:600;">@suggestedQty</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                                @if (LowStockItems.Count > 5)
+                        <div class="premium-card-footer">
+                            <div class="activity-list">
+                                @foreach (var detail in RecentCheckInDetails.Take(4))
                                 {
-                                    <div style="text-align:center; margin-top:8px;">
-                                        <a href="/inventory/alerts" style="color:#0f766e; font-size:0.85rem; text-decoration:none;">View All @LowStockItems.Count Items →</a>
+                                    <div class="activity-item">
+                                        <div class="activity-avatar">@detail.GuestName.Substring(0, 1)</div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">@detail.GuestName</div>
+                                            <div class="activity-meta">@detail.Date.ToString("MMM dd") · Room @(string.IsNullOrWhiteSpace(detail.Rooms) ? "-" : detail.Rooms)</div>
+                                        </div>
+                                        <span class="activity-badge success">@detail.Status</span>
                                     </div>
                                 }
                             </div>
@@ -166,16 +223,172 @@
                     }
                 </div>
 
-                <!-- Attendance Chart -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>👥 Employee Attendance Status</h3>
+                <!-- Attendance Status -->
+                <div class="premium-card">
+                    <div class="premium-card-header">
+                        <h3 class="premium-card-title">
+                            <span class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                            </span>
+                            Employee Attendance
+                        </h3>
+                        <span class="range-note">@(RangeStart.Date == RangeEnd.Date ? RangeStart.ToString("MMM dd") : $"{RangeStart:MMM dd} - {RangeEnd:MMM dd}")</span>
                     </div>
-                    <div class="chart-body">
-                        <canvas id="attendanceChart"></canvas>
+                    <div class="premium-card-body">
+                        @if (AttendanceDetails.Any())
+                        {
+                            <div class="attendance-summary">
+                                <div class="status-count present"><span class="dot dot-green"></span><strong>@AttendanceStatus.Present</strong> @(SelectedRange == "Today" ? "Present" : "Days Present")</div>
+                                <div class="status-count absent"><span class="dot dot-red"></span><strong>@AttendanceStatus.Absent</strong> @(SelectedRange == "Today" ? "Absent" : "Days Absent")</div>
+                                <div class="status-count on-leave"><span class="dot dot-amber"></span><strong>@AttendanceStatus.OnLeave</strong> @(SelectedRange == "Today" ? "On Leave" : "Days On Leave")</div>
+                                <div class="status-count late"><span class="dot dot-orange"></span><strong>@AttendanceStatus.Late</strong> @(SelectedRange == "Today" ? "Late" : "Days Late")</div>
+                            </div>
+                            <div class="activity-list">
+                                @foreach (var att in AttendanceDetails.Take(5))
+                                {
+                                    var statusClass = att.Status?.ToLower() ?? "pending";
+                                    var badgeClass = statusClass == "present" ? "success" : (statusClass == "absent" ? "danger" : "warning");
+                                    <div class="activity-item" @onclick="() => OpenAttendanceModal(att.EmployeeId)" style="cursor: pointer;">
+                                        <div class="activity-avatar">@att.EmployeeName.Substring(0, 1)</div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">@att.EmployeeName</div>
+                                            <div class="activity-meta">ID: @att.EmployeeId · @att.Date.ToString("MMM dd")</div>
+                                        </div>
+                                        <span class="activity-badge @badgeClass">@att.Status</span>
+                                    </div>
+                                }
+                            </div>
+                            @if (AttendanceDetails.Count > 5)
+                            {
+                                <div style="text-align: center; margin-top: 16px;">
+                                    <button class="btn-secondary" @onclick="() => ShowAttendanceModal = true" style="font-size: 0.85rem; padding: 8px 16px; border-radius: 8px;">View All @AttendanceDetails.Count Records →</button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="empty-state-premium">
+                                <div class="empty-state-icon">
+                                    <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                                </div>
+                                <div class="empty-state-title">No Attendance Data</div>
+                                <div class="empty-state-desc">Attendance records will appear here.</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Inventory Chart -->
+                <div class="premium-card dashboard-grid-full">
+                    <div class="premium-card-header">
+                        <h3 class="premium-card-title">
+                            <span class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zM12 5.5v9l6-4.5z"/></svg>
+                            </span>
+                            Inventory Overview
+                        </h3>
+                    </div>
+                    <div class="premium-card-body">
+                         @if (InventoryByCategory.Any())
+                        {
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="inventoryChart"></canvas>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="empty-state-premium">
+                                <div class="empty-state-title">No Inventory Data</div>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
+
+            <!-- Attendance Details Modal -->
+            @if (ShowAttendanceModal)
+            {
+                <div class="modal-overlay" @onclick="CloseAttendanceModal">
+                    <div class="modal-content" @onclick:stopPropagation="true">
+                        <div class="modal-header">
+                            <h2>@(SelectedEmployeeId != null ? $"Attendance Details - Employee {SelectedEmployeeId}" : "All Attendance Records")</h2>
+                            <button class="modal-close" @onclick="CloseAttendanceModal">×</button>
+                        </div>
+                        <div class="modal-body">
+                            @if (SelectedEmployeeId != null)
+                            {
+                                var empRecords = AttendanceDetails.Where(a => a.EmployeeId == SelectedEmployeeId).ToList();
+                                @if (empRecords.Any())
+                                {
+                                    <div class="emp-attendance-header">
+                                        <h3>@empRecords.First().EmployeeName</h3>
+                                        <p style="color: #64748b;">Employee ID: @SelectedEmployeeId</p>
+                                    </div>
+                                    <div class="attendance-stats-grid">
+                                        <div class="stat-box"><strong>@empRecords.Count(r => r.Status == "Present")</strong> Days Present</div>
+                                        <div class="stat-box"><strong>@empRecords.Count(r => r.Status == "Absent")</strong> Days Absent</div>
+                                        <div class="stat-box"><strong>@empRecords.Count(r => r.Status == "OnLeave")</strong> Days On Leave</div>
+                                        <div class="stat-box"><strong>@empRecords.Count(r => r.Status == "Late")</strong> Days Late</div>
+                                    </div>
+                                    <table class="modal-attendance-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                                <th>Check In</th>
+                                                <th>Check Out</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var record in empRecords)
+                                            {
+                                                var statusClass = record.Status?.ToLower() ?? "pending";
+                                                <tr>
+                                                    <td>@record.Date.ToString("MMM dd, yyyy")</td>
+                                                    <td><span class="status-badge status-@statusClass">@record.Status</span></td>
+                                                    <td>@record.CheckInTime</td>
+                                                    <td>@record.CheckOutTime</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            }
+                            else
+                            {
+                                <table class="modal-attendance-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>ID</th>
+                                            <th>Date</th>
+                                            <th>Status</th>
+                                            <th>Check In</th>
+                                            <th>Check Out</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var record in AttendanceDetails)
+                                        {
+                                            var statusClass = record.Status?.ToLower() ?? "pending";
+                                            <tr>
+                                                <td style="font-weight: 600;">@record.EmployeeName</td>
+                                                <td>@record.EmployeeId</td>
+                                                <td>@record.Date.ToString("MMM dd")</td>
+                                                <td><span class="status-badge status-@statusClass">@record.Status</span></td>
+                                                <td>@record.CheckInTime</td>
+                                                <td>@record.CheckOutTime</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+
         }
     </section>
 </div>
@@ -184,12 +397,25 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+    private bool ChartsRendered = false;
+
+    private string SelectedRange = "Today";
+    private DateTime RangeStart = DateTime.Today;
+    private DateTime RangeEnd = DateTime.Today;
 
     private int AvailableRooms = 0;
     private int TotalRooms = 0;
     private int ActiveGuests = 0;
     private int PendingHousekeepingTasks = 0;
     private decimal TotalOutstanding = 0m;
+    private int TodayCheckouts = 0;
+    private decimal TodayPayments = 0m;
+    private double OccupancyRate = 0d;
+
+    // Comparisons
+    private int YesterdayAvailableRooms = 0;
+    private int YesterdayActiveGuests = 0;
+    private double YesterdayOccupancyRate = 0d;
 
     // Employee data
     private int TotalEmployees = 0;
@@ -205,9 +431,14 @@
 
     // Chart data
     private List<DailyCheckIn> DailyCheckIns = new();
+    private List<CheckInDetail> RecentCheckInDetails = new();
     private List<InventoryCategoryData> InventoryByCategory = new();
     private AttendanceStatusData AttendanceStatus = new();
+    private List<AttendanceDetail> AttendanceDetails = new();
     private List<InventoryItem> LowStockItems = new();
+    
+    private bool ShowAttendanceModal = false;
+    private string? SelectedEmployeeId = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -227,29 +458,69 @@
         {
             IsLoaded = false;
             HasError = false;
+            ChartsRendered = false;
 
-            TotalRooms = await DbContext.Rooms.CountAsync();
-            AvailableRooms = await DbContext.Rooms.CountAsync(r => r.Status == "Available");
+            UpdateRangeDates();
 
-            // Active guests: reservations with current date inside check-in/out
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            ActiveGuests = await DbContext.Reservations.CountAsync(r => r.CheckInDate <= today && (r.CheckOutDate == null || r.CheckOutDate >= today));
+            using var context = await DbFactory.CreateDbContextAsync();
 
-            PendingHousekeepingTasks = await DbContext.CleaningTasks.CountAsync(t => t.Status == "Pending");
+            TotalRooms = await context.Rooms.CountAsync();
+            AvailableRooms = await context.Rooms.CountAsync(r => r.Status == "Available");
 
-            TotalOutstanding = await DbContext.Bills.Where(b => b.BalanceDue != null).SumAsync(b => (decimal?)b.BalanceDue) ?? 0m;
+            var snapshotDate = DateOnly.FromDateTime(RangeEnd);
+            ActiveGuests = await context.Reservations.CountAsync(r => r.CheckInDate <= snapshotDate && (r.CheckOutDate >= snapshotDate));
+
+            PendingHousekeepingTasks = await context.CleaningTasks.CountAsync(t => t.Status == "Pending");
+
+            TotalOutstanding = await context.Bills.Where(b => b.BalanceDue != null).SumAsync(b => (decimal?)b.BalanceDue) ?? 0m;
+
+            var rangeStartDateOnly = DateOnly.FromDateTime(RangeStart);
+            var rangeEndDateOnly = DateOnly.FromDateTime(RangeEnd);
+
+            TodayCheckouts = await context.Reservations.CountAsync(r => r.CheckOutDate >= rangeStartDateOnly && r.CheckOutDate <= rangeEndDateOnly);
+
+            var rangeStartDateTime = RangeStart.Date;
+            var rangeEndDateTime = RangeEnd.Date.AddDays(1);
+            TodayPayments = await context.Payments
+                .Where(p => p.PaymentDate >= rangeStartDateTime && p.PaymentDate < rangeEndDateTime)
+                .SumAsync(p => (decimal?)p.Amount) ?? 0m;
+
+            OccupancyRate = TotalRooms == 0 ? 0 : Math.Round((double)(TotalRooms - AvailableRooms) / TotalRooms * 100, 1);
+
+            // Fetch Comparisons (Assuming "Yesterday" for simplicity when "Today" is selected)
+            // If Range is Year/Month, comparisons could be Last Year/Month, but let's stick to previous day relative to snapshot for now
+            // or if Range is "Today", compare to "Yesterday".
+            
+            DateOnly comparisonDate;
+            if (SelectedRange == "Today")
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1));
+            else if (SelectedRange == "Week")
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-7)); // Compare to last week
+            else 
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1)); // Compare to last month
+
+            // Comparison Metrics
+            var yesterdaySnapshotDate = comparisonDate;
+            // Note: This is an approximation. Strict historical room availability isn't stored.
+            // We use Reservation data to infer historical occupancy.
+            var comparisonOccupied = await context.Reservations.CountAsync(r => r.CheckInDate <= yesterdaySnapshotDate && r.CheckOutDate > yesterdaySnapshotDate);
+            YesterdayAvailableRooms = TotalRooms - comparisonOccupied; // Rough estimate assuming total rooms constant
+            YesterdayActiveGuests = comparisonOccupied; // Rough estimate
+            YesterdayOccupancyRate = TotalRooms == 0 ? 0 : Math.Round((double)comparisonOccupied / TotalRooms * 100, 1);
 
             // Load employee data
-            await LoadEmployeeData();
+            await LoadEmployeeData(context);
 
             // Load cleaning schedule data
             await LoadCleaningData();
 
             // Load chart data
-            await LoadChartData();
+            await LoadChartData(context);
 
             IsLoaded = true;
             StateHasChanged();
+
+            await RenderCharts();
         }
         catch (Exception ex)
         {
@@ -260,24 +531,24 @@
         }
     }
 
-    private async Task LoadEmployeeData()
+    private async Task LoadEmployeeData(HestiaLinkContext context)
     {
         try
         {
-            var todayDate = DateOnly.FromDateTime(DateTime.Today);
+            var todayDate = DateOnly.FromDateTime(RangeEnd);
             
             // Total active employees
-            TotalEmployees = await DbContext.Employees.CountAsync(e => e.Status == "Active");
+            TotalEmployees = await context.Employees.CountAsync(e => e.Status == "Active");
 
             // Get today's schedules
-            var todaySchedules = await DbContext.Schedules
+            var todaySchedules = await context.Schedules
                 .Where(s => s.ScheduleDate == todayDate && s.IsActive == true)
                 .ToListAsync();
 
             var scheduleIds = todaySchedules.Select(s => s.ScheduleId).ToList();
 
             // Get today's attendances
-            var todayAttendances = await DbContext.Attendances
+            var todayAttendances = await context.Attendances
                 .Include(a => a.Schedule)
                 .Where(a => a.AttendanceDate == todayDate && scheduleIds.Contains(a.ScheduleId))
                 .ToListAsync();
@@ -323,20 +594,29 @@
         }
     }
 
-    private async Task LoadChartData()
+    private async Task LoadChartData(HestiaLinkContext context)
     {
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var sevenDaysAgo = today.AddDays(-6);
+            var today = DateOnly.FromDateTime(RangeEnd);
+            var rangeStartDate = DateOnly.FromDateTime(RangeStart);
+            var rangeEndDate = DateOnly.FromDateTime(RangeEnd);
 
-            // 1. Daily Check-Ins (Last 7 Days)
+            // Pull all check-ins in a single range query to reuse for chart and details
+            var checkInRange = await context.Reservations
+                .Include(r => r.Guest)
+                .Include(r => r.ReservedRooms)
+                    .ThenInclude(rr => rr.Room)
+                .Where(r => r.CheckInDate >= rangeStartDate && r.CheckInDate <= rangeEndDate)
+                .ToListAsync();
+
+            // 1. Daily Check-Ins (Selected Range)
             DailyCheckIns.Clear();
-            for (int i = 6; i >= 0; i--)
+            var totalDays = (rangeEndDate.ToDateTime(TimeOnly.MinValue) - rangeStartDate.ToDateTime(TimeOnly.MinValue)).Days + 1;
+            for (int i = 0; i < totalDays; i++)
             {
-                var date = today.AddDays(-i);
-                var checkInCount = await DbContext.Reservations
-                    .CountAsync(r => r.CheckInDate == date);
+                var date = rangeStartDate.AddDays(i);
+                var checkInCount = checkInRange.Count(r => r.CheckInDate == date);
                 DailyCheckIns.Add(new DailyCheckIn
                 {
                     Date = date,
@@ -344,9 +624,23 @@
                 });
             }
 
+            // Build recent check-in detail list (latest first)
+            RecentCheckInDetails = checkInRange
+                .OrderByDescending(r => r.CheckInDate)
+                .ThenByDescending(r => r.CreatedDate ?? DateTime.MinValue)
+                .Take(8)
+                .Select(r => new CheckInDetail
+                {
+                    Date = r.CheckInDate,
+                    GuestName = r.Guest != null ? $"{r.Guest.FirstName} {r.Guest.LastName}" : "Walk-in",
+                    Rooms = string.Join(", ", r.ReservedRooms.Select(rr => rr.Room?.RoomNumber ?? "—")),
+                    Status = string.IsNullOrWhiteSpace(r.Status) ? "Confirmed" : r.Status
+                })
+                .ToList();
+
             // 2. Inventory by Category
             InventoryByCategory.Clear();
-            var inventoryItems = await DbContext.InventoryItems
+            var inventoryItems = await context.InventoryItems
                 .Where(i => i.IsActive == true)
                 .ToListAsync();
             
@@ -371,21 +665,38 @@
                 .OrderBy(i => i.CurrentStock ?? 0)
                 .ToList();
 
-            // 3. Attendance Status (Today)
-            var todayDate = DateOnly.FromDateTime(DateTime.Today);
-            var todayAttendances = await DbContext.Attendances
+            // 3. Attendance Status (Range-based)
+            var rangeStartDateOnly = DateOnly.FromDateTime(RangeStart);
+            var rangeEndDateOnly = DateOnly.FromDateTime(RangeEnd);
+            
+            var rangeAttendances = await context.Attendances
                 .Include(a => a.Schedule)
-                .Where(a => a.AttendanceDate == todayDate)
+                    .ThenInclude(s => s.Employee)
+                .Where(a => a.AttendanceDate >= rangeStartDateOnly && a.AttendanceDate <= rangeEndDateOnly)
                 .ToListAsync();
 
             AttendanceStatus = new AttendanceStatusData
             {
-                Present = todayAttendances.Count(a => a.AttendanceStatus == "Present"),
-                Absent = todayAttendances.Count(a => a.AttendanceStatus == "Absent"),
-                OnLeave = todayAttendances.Count(a => a.AttendanceStatus == "OnLeave"),
-                Late = todayAttendances.Count(a => a.AttendanceStatus == "Late" || (a.ActualCheckIn.HasValue && a.Schedule != null && a.ActualCheckIn.Value.TimeOfDay > a.Schedule.ScheduledStart.ToTimeSpan().Add(TimeSpan.FromMinutes(15)))),
-                TotalEmployees = await DbContext.Employees.CountAsync(e => e.Status == "Active")
+                Present = rangeAttendances.Count(a => a.AttendanceStatus == "Present"),
+                Absent = rangeAttendances.Count(a => a.AttendanceStatus == "Absent"),
+                OnLeave = rangeAttendances.Count(a => a.AttendanceStatus == "OnLeave"),
+                Late = rangeAttendances.Count(a => a.AttendanceStatus == "Late" || (a.ActualCheckIn.HasValue && a.Schedule != null && a.ActualCheckIn.Value.TimeOfDay > a.Schedule.ScheduledStart.ToTimeSpan().Add(TimeSpan.FromMinutes(15)))),
+                TotalEmployees = await context.Employees.CountAsync(e => e.Status == "Active")
             };
+
+            // Build attendance detail list (latest first)
+            AttendanceDetails = rangeAttendances
+                .OrderByDescending(a => a.AttendanceDate)
+                .Select(a => new AttendanceDetail
+                {
+                    EmployeeId = a.Schedule?.Employee?.EmployeeId.ToString() ?? "—",
+                    EmployeeName = a.Schedule?.Employee != null ? $"{a.Schedule.Employee.FirstName} {a.Schedule.Employee.LastName}" : "Unknown",
+                    Status = a.AttendanceStatus ?? "Pending",
+                    Date = a.AttendanceDate,
+                    CheckInTime = a.ActualCheckIn?.ToString("hh:mm tt") ?? "—",
+                    CheckOutTime = a.ActualCheckOut?.ToString("hh:mm tt") ?? "—"
+                })
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -397,8 +708,11 @@
     {
         try
         {
-            // Wait for DOM to be ready
-            await Task.Delay(500);
+            if (!IsLoaded || HasError || ChartsRendered)
+                return;
+
+            // Wait briefly for DOM to be ready
+            await Task.Delay(300);
             StateHasChanged();
 
             // 1. Check-In Line Chart
@@ -429,20 +743,8 @@
                     "Stock Quantity");
             }
 
-            // 3. Attendance Doughnut Chart
-            var attendanceLabels = new[] { "Present", "Absent", "On Leave", "Late" };
-            var attendanceData = new[] { 
-                (double)AttendanceStatus.Present, 
-                (double)AttendanceStatus.Absent, 
-                (double)AttendanceStatus.OnLeave, 
-                (double)AttendanceStatus.Late 
-            };
-            var attendanceColors = new[] { "#10b981", "#ef4444", "#f59e0b", "#f97316" };
-            await JSRuntime.InvokeVoidAsync("chartHelper.renderDoughnutChart", 
-                "attendanceChart", 
-                attendanceLabels, 
-                attendanceData, 
-                attendanceColors);
+            // 3. Attendance list data already loaded in AttendanceDetails
+            ChartsRendered = true;
         }
         catch (Exception ex)
         {
@@ -453,10 +755,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && IsLoaded && !HasError)
+        if (firstRender)
         {
-            // Wait for DOM to be ready and render charts
-            await Task.Delay(600);
             await RenderCharts();
         }
     }
@@ -466,6 +766,24 @@
     {
         public DateOnly Date { get; set; }
         public int Count { get; set; }
+    }
+
+    private class CheckInDetail
+    {
+        public DateOnly Date { get; set; }
+        public string GuestName { get; set; } = string.Empty;
+        public string Rooms { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+    }
+
+    private class AttendanceDetail
+    {
+        public string EmployeeId { get; set; } = string.Empty;
+        public string EmployeeName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateOnly Date { get; set; }
+        public string CheckInTime { get; set; } = string.Empty;
+        public string CheckOutTime { get; set; } = string.Empty;
     }
 
     private class InventoryCategoryData
@@ -484,102 +802,277 @@
         public int Late { get; set; }
         public int TotalEmployees { get; set; }
     }
+
+    private void UpdateRangeDates()
+    {
+        var today = DateTime.Today;
+        SelectedRange = string.IsNullOrWhiteSpace(SelectedRange) ? "Today" : SelectedRange;
+
+        switch (SelectedRange)
+        {
+            case "Week":
+                RangeEnd = today;
+                RangeStart = today.AddDays(-6);
+                break;
+            case "Month":
+                RangeEnd = today;
+                RangeStart = new DateTime(today.Year, today.Month, 1);
+                break;
+            case "Year":
+                RangeEnd = today;
+                RangeStart = new DateTime(today.Year, 1, 1);
+                break;
+            default:
+                RangeEnd = today;
+                RangeStart = today;
+                SelectedRange = "Today";
+                break;
+        }
+    }
+
+    private async Task OnRangeChanged(ChangeEventArgs e)
+    {
+        SelectedRange = e.Value?.ToString() ?? "Today";
+        UpdateRangeDates();
+        await LoadDashboardData();
+    }
+
+    private string RangeLabel => RangeStart.Date == RangeEnd.Date
+        ? RangeStart.ToString("MMM dd, yyyy")
+        : $"{RangeStart:MMM dd, yyyy} - {RangeEnd:MMM dd, yyyy}";
+
+    private void OpenAttendanceModal(string employeeId)
+    {
+        SelectedEmployeeId = employeeId;
+        ShowAttendanceModal = true;
+    }
+
+    private void CloseAttendanceModal()
+    {
+        ShowAttendanceModal = false;
+        SelectedEmployeeId = null;
+    }
 }
 
 <style>
-    /* Summary Cards - Matching Suppliers Style */
+    /* Summary Cards - Compact */
     .summary-cards {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 24px;
-        margin-bottom: 32px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 28px;
+        margin-bottom: 36px;
     }
 
-    .summary-card {
-        background: #e0f2f1; /* Light Cyan/Teal */
-        border-radius: 16px;
-        padding: 24px;
-        border: none;
+    .summary-cards.compact .summary-card {
+        background: #e5e2d9;
+        border-radius: 10px;
+        padding: 22px 24px;
+        border: 1px solid rgba(0, 0, 0, 0.04);
         box-shadow: none;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
-        height: 160px;
-        position: relative;
-        transition: transform 0.2s;
-    }
-
-    .summary-card:hover {
-        transform: translateY(-2px);
+        justify-content: center;
+        min-height: 160px;
     }
 
     .summary-card .summary-label {
-        color: #0e7490; /* Cyan-700 */
-        font-size: 0.8rem;
+        color: #00535b;
+        font-size: 0.7rem;
         font-weight: 800;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.35px;
         text-transform: uppercase;
+        margin-bottom: 8px;
     }
 
     .summary-card .summary-value {
-        color: #0f172a; /* Slate-900 */
-        font-size: 3.5rem;
+        color: #0f172a;
+        font-size: 1.8rem;
         font-weight: 800;
-        line-height: 1;
-        text-align: right;
+        line-height: 1.05;
         margin: 0;
     }
 
     .summary-card .summary-desc {
-        color: #64748b; /* Slate-500 */
-        font-size: 0.85rem;
+        color: #64748b;
+        font-size: 0.78rem;
         font-weight: 500;
-        margin-top: auto;
+        margin-top: 8px;
+    }
+
+    .stat-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        align-items: start;
+    }
+
+    .stat-row.single {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-sep {
+        width: 1px;
+        background: rgba(0, 0, 0, 0.08);
+        justify-self: center;
+    }
+
+    .summary-value.accent-green { color: #10b981; }
+    .summary-value.accent-orange { color: #f97316; }
+    .summary-value.accent-red { color: #ef4444; }
+
+    /* Filters */
+    .dashboard-filters {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #ffffff;
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .filter-group label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .filter-group select {
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .range-note {
+        font-size: 0.85rem;
+        color: #475569;
+    }
+
+    .skeleton-wrapper {
+        display: grid;
+        gap: 20px;
+    }
+
+    .insight-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .insight-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .insight-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.35px;
+        color: #00535b;
+        font-weight: 800;
+    }
+
+    .insight-value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin-top: 4px;
+        line-height: 1.1;
+    }
+
+    .insight-desc {
+        color: #64748b;
+        font-size: 0.82rem;
+        margin-top: 2px;
+    }
+
+    .skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .skeleton-card, .skeleton-chart {
+        background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s ease-in-out infinite;
+        border-radius: 12px;
+    }
+
+    .skeleton-card { height: 120px; }
+    .skeleton-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .skeleton-chart { height: 260px; }
+
+    @@keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
     }
 
     /* Charts Grid */
     .charts-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
-        margin-top: 32px;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 28px;
+        margin-top: 44px;
     }
 
     .chart-card {
         background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        border: 1px solid #e5e7eb;
+        min-height: 300px;
     }
 
     .chart-header {
-        background: linear-gradient(90deg, #064e49, #0f766e);
+        background: linear-gradient(90deg, #00535b, #0093a0);
         color: white;
-        padding: 16px 20px;
+        padding: 14px 16px;
     }
 
     .chart-header h3 {
         margin: 0;
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 700;
     }
 
     .chart-body {
-        padding: 20px;
-        height: 300px;
+        padding: 16px 18px;
+        min-height: 220px;
         position: relative;
+        flex-grow: 1;
     }
 
     .chart-footer {
-        padding: 16px 20px;
+        padding: 14px 18px;
         border-top: 1px solid #e5e7eb;
         background: #f9fafb;
     }
 
+    .chart-footer.muted {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+
     .restock-info h4 {
-        margin: 0 0 12px 0;
+        margin: 0 0 10px 0;
         font-size: 0.9rem;
         font-weight: 700;
         color: #991b1b;
@@ -599,6 +1092,21 @@
         font-size: 0.75rem;
         text-transform: uppercase;
         border-bottom: 1px solid #e5e7eb;
+        background: #f8fafc;
+    }
+
+    .empty-state {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        font-size: 0.95rem;
+        height: 100%;
+        text-align: center;
+        background: #f8fafc;
+        border: 1px dashed #e5e7eb;
+        border-radius: 10px;
+        padding: 12px;
     }
 
     .restock-table td {
@@ -618,15 +1126,358 @@
         color: #991b1b;
     }
 
+    .checkin-list {
+        display: grid;
+        gap: 6px;
+        font-size: 0.88rem;
+    }
+
+    .checkin-list-header,
+    .checkin-row {
+        display: grid;
+        grid-template-columns: 90px 1fr 1fr 100px;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .checkin-list-header {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #475569;
+        font-weight: 700;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 4px;
+    }
+
+    .checkin-row {
+        padding: 6px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .checkin-row:last-child {
+        border-bottom: none;
+    }
+
+    .checkin-row .strong {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .status-pill {
+        display: inline-block;
+        background: #e5e2d9;
+        color: #0093a0;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: capitalize;
+        justify-self: start;
+    }
+
+    .chart-flex {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 12px;
+        align-items: center;
+        min-height: 220px;
+    }
+
+    .attendance-stats {
+        display: grid;
+        gap: 8px;
+        font-size: 0.9rem;
+    }
+
+    .attendance-stats .muted {
+        color: #64748b;
+        font-size: 0.85rem;
+    }
+
+    .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        display: inline-block;
+        margin-right: 6px;
+    }
+
+    .dot-green { background: #10b981; }
+    .dot-red { background: #ef4444; }
+    .dot-amber { background: #f59e0b; }
+    .dot-orange { background: #f97316; }
+
+    /* Attendance Summary & List */
+    .attendance-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .status-count {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        padding: 8px;
+        background: #f8fafc;
+        border-radius: 8px;
+    }
+
+    .status-count strong {
+        font-size: 1.1rem;
+        color: #0f172a;
+    }
+
+    .attendance-list {
+        display: grid;
+        gap: 8px;
+    }
+
+    .attendance-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        border-left: 3px solid #e5e7eb;
+        transition: all 0.2s ease;
+    }
+
+    .attendance-item:hover {
+        background: #e5e2d9;
+        transform: translateX(4px);
+        box-shadow: 0 2px 8px rgba(0, 147, 160, 0.15);
+    }
+
+    .emp-info {
+        flex-grow: 1;
+    }
+
+    .emp-name {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.9rem;
+    }
+
+    .emp-id {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
+    .status-badge.status-present {
+        background: #d1fae5;
+        color: #065f46;
+        border-left-color: #10b981;
+    }
+
+    .status-badge.status-absent {
+        background: #fee2e2;
+        color: #991b1b;
+        border-left-color: #ef4444;
+    }
+
+    .status-badge.status-onleave {
+        background: #fef3c7;
+        color: #92400e;
+        border-left-color: #f59e0b;
+    }
+
+    .status-badge.status-late {
+        background: #fed7aa;
+        color: #9a3412;
+        border-left-color: #f97316;
+    }
+
+    .attendance-item:has(.status-badge.status-present) {
+        border-left-color: #10b981;
+    }
+
+    .attendance-item:has(.status-badge.status-absent) {
+        border-left-color: #ef4444;
+    }
+
+    .attendance-item:has(.status-badge.status-onleave) {
+        border-left-color: #f59e0b;
+    }
+
+    .attendance-item:has(.status-badge.status-late) {
+        border-left-color: #f97316;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 900px;
+        max-height: 85vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        background: linear-gradient(90deg, #00535b, #0093a0);
+        color: white;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        color: white;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+
+    .modal-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex-grow: 1;
+    }
+
+    .emp-attendance-header {
+        margin-bottom: 20px;
+    }
+
+    .emp-attendance-header h3 {
+        margin: 0 0 4px 0;
+        font-size: 1.3rem;
+        color: #0f172a;
+    }
+
+    .attendance-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .stat-box {
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        border-left: 3px solid #0093a0;
+    }
+
+    .stat-box strong {
+        display: block;
+        font-size: 1.5rem;
+        color: #0093a0;
+        margin-bottom: 4px;
+    }
+
+    .modal-attendance-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .modal-attendance-table thead {
+        background: #f8fafc;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .modal-attendance-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 700;
+        color: #64748b;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .modal-attendance-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .modal-attendance-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
     @@media (max-width: 1200px) {
         .charts-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+        .insight-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @@media (max-width: 900px) {
+        .summary-cards {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .insight-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .skeleton-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @@media (max-width: 768px) {
         .charts-grid {
             grid-template-columns: 1fr;
         }
+        .summary-cards {
+            grid-template-columns: 1fr;
+        }
+        .insight-row { grid-template-columns: 1fr; }
+        .skeleton-grid { grid-template-columns: 1fr; }
+        .skeleton-charts { grid-template-columns: 1fr; }
     }
 </style>

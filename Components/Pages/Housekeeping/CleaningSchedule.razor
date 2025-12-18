@@ -3,7 +3,9 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@using System.Linq
+@using Room = HestiaLink.Models.Room
+@inject IDbContextFactory<HestiaLink.Data.HestiaLinkContext> DbFactory
 @inject HousekeepingService HousekeepingService
 @inject NavigationManager Navigation
 @inject UserSession UserSession
@@ -13,7 +15,7 @@
 <div class="page-wrapper">
     <header class="page-topbar">
         <div>
-            <h1>🗓️ Cleaning Schedule</h1>
+            <h1><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg> Cleaning Schedule</h1>
             <span class="page-topbar-subtitle">Assign and manage room cleaning tasks</span>
         </div>
         <UserDropdown />
@@ -23,7 +25,7 @@
         @if (HasError)
         {
             <div style="padding:12px; border-radius:8px; background:#fff4f8; color:#7f1d1d; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                <span>⚠️ @ErrorMessage</span>
+                <span><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> @ErrorMessage</span>
                 <button class="btn-create" @onclick="LoadData">Retry</button>
             </div>
         }
@@ -36,27 +38,39 @@
         }
         else
         {
-            <!-- Summary Cards -->
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-label">NEEDS CLEANING</div>
-                    <div class="summary-value">@RoomsForCleaning.Count</div>
-                    <div class="summary-desc">Rooms requiring cleaning</div>
+            <!-- Summary Cards - Matching Dashboard Hero Stats -->
+            <div class="dashboard-hero" style="margin-bottom:32px;">
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19.36 2.72L20.78 4.14L15.06 9.85C16.13 11.39 16.28 13.24 15.38 14.44L9.06 8.12C10.26 7.22 12.11 7.37 13.65 8.44L19.36 2.72M5.93 17.57C3.92 15.56 2.69 13.16 2.35 10.92L7.23 8.83L14.67 16.27L12.58 21.15C10.34 20.81 7.94 19.58 5.93 17.57Z"/></svg>
+                   </div>
+                    <div class="hero-stat-value">@RoomsForCleaning.Count</div>
+                    <div class="hero-stat-label">Needs Cleaning</div>
+                    <div class="hero-stat-change">Rooms requiring cleaning</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">ACTIVE TASKS</div>
-                    <div class="summary-value">@ActiveTasks.Count</div>
-                    <div class="summary-desc">Currently in progress</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@ActiveTasks.Count</div>
+                    <div class="hero-stat-label">Active Tasks</div>
+                    <div class="hero-stat-change">Currently in progress</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">AVAILABLE STAFF</div>
-                    <div class="summary-value">@AvailableHousekeepers.Count</div>
-                    <div class="summary-desc">Housekeepers available</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@AvailableHousekeepers.Count</div>
+                    <div class="hero-stat-label">Available Staff</div>
+                    <div class="hero-stat-change">Housekeepers available</div>
                 </div>
-                <div class="summary-card">
-                    <div class="summary-label">MAINTENANCE</div>
-                    <div class="summary-value">@RoomsUnderMaintenance.Count</div>
-                    <div class="summary-desc">Rooms under maintenance</div>
+                <div class="hero-stat">
+                    <div class="hero-stat-icon">
+                        <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+                    </div>
+                    <div class="hero-stat-value">@RoomsUnderMaintenance.Count</div>
+                    <div class="hero-stat-label">Maintenance</div>
+                    <div class="hero-stat-change">Rooms under maintenance</div>
                 </div>
             </div>
 
@@ -64,16 +78,16 @@
             <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap;">
                 <div class="tab-group" style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button class="tab-btn @(ActiveTab == "cleaning" ? "active" : "")" @onclick='() => SwitchTab("cleaning")'>
-                        🧹 For Cleaning (@RoomsForCleaning.Count)
+                        <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.36 2.72L20.78 4.14L15.06 9.85C16.13 11.39 16.28 13.24 15.38 14.44L9.06 8.12C10.26 7.22 12.11 7.37 13.65 8.44L19.36 2.72M5.93 17.57C3.92 15.56 2.69 13.16 2.35 10.92L7.23 8.83L14.67 16.27L12.58 21.15C10.34 20.81 7.94 19.58 5.93 17.57Z"/></svg> For Cleaning (@RoomsForCleaning.Count)
                     </button>
                     <button class="tab-btn @(ActiveTab == "active" ? "active" : "")" @onclick='() => SwitchTab("active")'>
-                        📋 Active Tasks (@ActiveTasks.Count)
+                        <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg> Active Tasks (@ActiveTasks.Count)
                     </button>
                     <button class="tab-btn @(ActiveTab == "maintenance" ? "active" : "")" @onclick='() => SwitchTab("maintenance")'>
-                        🔧 Maintenance (@RoomsUnderMaintenance.Count)
+                        <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg> Maintenance (@RoomsUnderMaintenance.Count)
                     </button>
                 </div>
-                <button class="btn-create" @onclick="LoadData">🔄 Refresh</button>
+                <button class="btn-create" @onclick="LoadData">Refresh</button>
             </div>
 
             <!-- Tab Content -->
@@ -82,29 +96,29 @@
                 @if (!RoomsForCleaning.Any())
                 {
                     <div style="text-align:center; padding:60px 20px; background:white; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
-                        <span style="font-size:3rem; display:block; margin-bottom:12px;">✨</span>
+                        <span style="font-size:3rem; display:block; margin-bottom:12px;"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></span>
                         <p style="color:#6b7280; font-size:1rem; margin:0;">All rooms are clean!</p>
                     </div>
                 }
                 else
                 {
-                    <div class="cards-grid">
+                    <div class="room-grid">
                         @foreach (var room in RoomsForCleaning)
                         {
-                            <div class="user-card">
-                                <div class="card-top">
-                                    <div class="avatar">@GetAvatarInitials(room.RoomNumber)</div>
-                                    <div class="card-title">Room @room.RoomNumber <span style="font-weight:600; font-size:0.9rem; color:#64748b; margin-left:8px;">(Floor @room.Floor)</span></div>
-                                    <div class="status-badge badge-cleaning">For Cleaning</div>
+                            <div class="room-card">
+                                <div class="room-card-header">
+                                    <div>
+                                        <div class="room-number">Room @room.RoomNumber</div>
+                                        <div class="room-floor">Floor @room.Floor</div>
+                                    </div>
+                                    <span class="chip chip-warning">For Cleaning</span>
                                 </div>
-                                <div class="card-body">
-                                    <div><strong>Type:</strong> @(room.RoomType?.TypeName ?? "Standard")</div>
-                                    <div><strong>Floor:</strong> @room.Floor</div>
+                                <div class="room-meta">
+                                    <div><span class="meta-label">Type:</span> @(room.RoomType?.TypeName ?? "Standard")</div>
+                                    <div><span class="meta-label">Floor:</span> @room.Floor</div>
                                 </div>
-                                <div class="card-actions">
-                                    <button class="btn-primary" @onclick="() => OpenAssignModal(room)">
-                                        👤 Assign Staff
-                                    </button>
+                                <div class="room-actions">
+                                    <button class="btn-room-primary" @onclick="() => OpenAssignModal(room)">Assign Staff</button>
                                 </div>
                             </div>
                         }
@@ -116,36 +130,34 @@
                 @if (!ActiveTasks.Any())
                 {
                     <div style="text-align:center; padding:60px 20px; background:white; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
-                        <span style="font-size:3rem; display:block; margin-bottom:12px;">📋</span>
+                        <span style="font-size:3rem; display:block; margin-bottom:12px;"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></span>
                         <p style="color:#6b7280; font-size:1rem; margin:0;">No active tasks</p>
                     </div>
                 }
                 else
                 {
-                    <div class="cards-grid">
+                    <div class="room-grid">
                         @foreach (var task in ActiveTasks)
                         {
-                            <div class="user-card">
-                                <div class="card-top">
-                                    <div class="avatar">@GetAvatarInitials(task.Room?.RoomNumber ?? "NA")</div>
-                                    <div class="card-title">Room @(task.Room?.RoomNumber ?? "N/A") <span style="font-weight:600; font-size:0.9rem; color:#64748b; margin-left:8px;">(Floor @(task.Room?.Floor ?? 0))</span></div>
-                                    <div class="status-badge @(task.Status == "In Progress" ? "badge-info" : "badge-warning")">
-                                        @task.Status
+                            <div class="room-card">
+                                <div class="room-card-header">
+                                    <div>
+                                        <div class="room-number">Room @(task.Room?.RoomNumber ?? "N/A")</div>
+                                        <div class="room-floor">Floor @(task.Room?.Floor ?? 0)</div>
                                     </div>
+                                    <span class="chip @(task.Status == "In Progress" ? "chip-info" : "chip-warning")">@task.Status</span>
                                 </div>
-                                <div class="card-body">
-                                    <div><strong>Assigned:</strong> @(task.AssignedUser?.Username ?? "Unassigned")</div>
-                                    <div><strong>Type:</strong> @(task.Room?.RoomType?.TypeName ?? "Standard")</div>
-                                    <div><strong>Time:</strong> @task.AssignedDate.ToString("MMM dd, HH:mm")</div>
+                                <div class="room-meta">
+                                    <div><span class="meta-label">Assigned:</span> @(task.AssignedUser?.Username ?? "Unassigned")</div>
+                                    <div><span class="meta-label">Type:</span> @(task.Room?.RoomType?.TypeName ?? "Standard")</div>
+                                    <div><span class="meta-label">Time:</span> @task.AssignedDate.ToString("MMM dd, HH:mm")</div>
                                     @if (!string.IsNullOrEmpty(task.Notes))
                                     {
-                                        <div class="notes-box">📝 @task.Notes</div>
+                                        <div style="margin-top:8px; font-style:italic; color:#64748b;"><svg class="icon-inline-sm" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> @task.Notes</div>
                                     }
                                 </div>
-                                <div class="card-actions">
-                                    <button class="btn-success" @onclick="() => AdminCompleteTask(task)">
-                                        ✅ Mark Complete
-                                    </button>
+                                <div class="room-actions">
+                                    <button class="btn-room-primary" @onclick="() => AdminCompleteTask(task)">Mark Complete</button>
                                 </div>
                             </div>
                         }
@@ -157,29 +169,29 @@
                 @if (!RoomsUnderMaintenance.Any())
                 {
                     <div style="text-align:center; padding:60px 20px; background:white; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.04);">
-                        <span style="font-size:3rem; display:block; margin-bottom:12px;">✅</span>
+                        <span style="font-size:3rem; display:block; margin-bottom:12px;"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
                         <p style="color:#6b7280; font-size:1rem; margin:0;">No maintenance issues</p>
                     </div>
                 }
                 else
                 {
-                    <div class="cards-grid">
+                    <div class="room-grid">
                         @foreach (var room in RoomsUnderMaintenance)
                         {
-                            <div class="user-card">
-                                <div class="card-top">
-                                    <div class="avatar avatar-danger">@GetAvatarInitials(room.RoomNumber)</div>
-                                    <div class="card-title">Room @room.RoomNumber <span style="font-weight:600; font-size:0.9rem; color:#64748b; margin-left:8px;">(Floor @room.Floor)</span></div>
-                                    <div class="status-badge badge-danger">Maintenance</div>
+                            <div class="room-card">
+                                <div class="room-card-header">
+                                    <div>
+                                        <div class="room-number">Room @room.RoomNumber</div>
+                                        <div class="room-floor">Floor @room.Floor</div>
+                                    </div>
+                                    <span class="chip chip-danger">Maintenance</span>
                                 </div>
-                                <div class="card-body">
-                                    <div><strong>Type:</strong> @(room.RoomType?.TypeName ?? "Standard")</div>
-                                    <div><strong>Floor:</strong> @room.Floor</div>
+                                <div class="room-meta">
+                                    <div><span class="meta-label">Type:</span> @(room.RoomType?.TypeName ?? "Standard")</div>
+                                    <div><span class="meta-label">Status:</span> Under Maintenance</div>
                                 </div>
-                                <div class="card-actions">
-                                    <button class="btn-info" @onclick="() => ResolveMaintenanceRoom(room)">
-                                        ✅ Resolve Issue
-                                    </button>
+                                <div class="room-actions">
+                                    <button class="btn-room-primary" @onclick="() => ResolveMaintenanceRoom(room)">Resolve Issue</button>
                                 </div>
                             </div>
                         }
@@ -213,7 +225,7 @@
                     @if (!AvailableHousekeepers.Any())
                     {
                         <div style="background:#fef3c7; color:#92400e; padding:12px; border-radius:8px; text-align:center;">
-                            ⚠️ No housekeeping staff available
+                            <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> No housekeeping staff available
                         </div>
                     }
                     else
@@ -253,7 +265,7 @@
                 <div style="font-size:0.9rem; color:#f8fafc;">Room @SelectedTask?.Room?.RoomNumber</div>
             </div>
             <div style="padding:30px 20px; text-align:center;">
-                <div style="font-size:4rem; color:#10b981; margin-bottom:20px;">✅</div>
+                <div style="font-size:4rem; color:#10b981; margin-bottom:20px;"><svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
                 <p style="font-size:1.1rem; color:#1e293b; margin-bottom:10px;">
                     Mark task for <strong>Room @SelectedTask?.Room?.RoomNumber</strong> as complete?
                 </p>
@@ -271,55 +283,171 @@
     </div>
 }
 
+<!-- Resolve Maintenance Modal -->
+@if (ShowResolveMaintenanceModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#ef4444;">
+                <h2 style="margin:0; color:white;">Resolve Issue</h2>
+                <div style="font-size:0.9rem; color:#fef2f2;">Room @SelectedRoom?.RoomNumber</div>
+            </div>
+            <div style="padding:18px;">
+                <div style="background:#fef2f2; padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid #fee2e2;">
+                    <div style="color:#991b1b; font-weight:700; margin-bottom:4px;">Under Maintenance</div>
+                    <div style="font-size:0.9rem; color:#b91c1c;">
+                        Current Status: Maintenance
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Resolution / Issue Notes:</label>
+                    <textarea class="form-input" @bind="MaintenanceNotes" placeholder="Describe the issue and how it was resolved..." rows="4"></textarea>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">
+                        These notes are for record keeping purposes.
+                    </div>
+                </div>
+            </div>
+            <div class="action-footer">
+                <button class="btn-secondary" @onclick="() => ShowResolveMaintenanceModal = false" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-primary" @onclick="ConfirmResolveMaintenance" disabled="@IsProcessing" style="background:#ef4444;">
+                    @if (IsProcessing) { <span>Saving...</span> } else { <span>Resolve & Available</span> }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
-    /* Summary Cards - Matching Suppliers Style */
-    .summary-cards {
+    /* Cleaning Cards */
+    .room-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 24px;
-        margin-bottom: 32px;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 18px;
     }
 
-    .summary-card {
-        background: #e0f2f1; /* Light Cyan/Teal */
-        border-radius: 16px;
-        padding: 24px;
-        border: none;
-        box-shadow: none;
+    .room-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 18px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
         display: flex;
         flex-direction: column;
+        gap: 10px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .room-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 22px rgba(0, 0, 0, 0.08);
+    }
+
+    .room-card-header {
+        display: flex;
+        align-items: flex-start;
         justify-content: space-between;
-        height: 160px;
-        position: relative;
-        transition: transform 0.2s;
+        gap: 10px;
     }
 
-    .summary-card:hover {
-        transform: translateY(-2px);
-    }
-
-    .summary-card .summary-label {
-        color: #0e7490; /* Cyan-700 */
-        font-size: 0.8rem;
+    .room-number {
         font-weight: 800;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
+        font-size: 1.2rem;
+        color: #0f172a;
     }
 
-    .summary-card .summary-value {
-        color: #0f172a; /* Slate-900 */
-        font-size: 3.5rem;
-        font-weight: 800;
-        line-height: 1;
-        text-align: right;
-        margin: 0;
+    .room-floor {
+        color: #475569;
+        font-size: 0.95rem;
     }
 
-    .summary-card .summary-desc {
-        color: #64748b; /* Slate-500 */
+    .chip {
+        padding: 8px 12px;
+        border-radius: 16px;
+        font-weight: 700;
         font-size: 0.85rem;
-        font-weight: 500;
-        margin-top: auto;
+        border: 1px solid transparent;
+    }
+
+    .chip-warning {
+        background: #fef3c7;
+        color: #b45309;
+        border-color: #fcd34d;
+    }
+
+    .chip-available {
+        background: #d1fae5;
+        color: #047857;
+        border-color: #a7f3d0;
+    }
+
+    .chip-info {
+        background: #dbeafe;
+        color: #1e40af;
+        border-color: #bfdbfe;
+    }
+
+    .chip-danger {
+        background: #fef2f2;
+        color: #991b1b;
+        border-color: #fecaca;
+    }
+
+    .room-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: #1f2937;
+    }
+
+    .room-meta div {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .meta-label {
+        font-weight: 700;
+        color: #111827;
+        margin-right: 6px;
+    }
+
+    .room-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .btn-room-primary {
+        flex: 1;
+        background: #008c9e;
+        color: white;
+        padding: 12px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.15s ease;
+    }
+
+    .btn-room-primary:hover {
+        background: #007a8b;
+    }
+
+    .btn-room-neutral {
+        flex: 1;
+        background: #e6e7e9;
+        color: #374151;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.15s ease;
+    }
+
+    .btn-room-neutral:hover {
+        background: #d9dbdf;
     }
 
     /* Cards Grid - Same as CheckInCheckOut */
@@ -332,19 +460,18 @@
     .user-card {
         background: white;
         border-radius: 12px;
-        padding: 14px;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        cursor: pointer;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        transition: all 0.2s ease;
     }
 
     .user-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         transform: translateY(-2px);
-        transition: all 0.2s ease;
     }
 
     .card-top {
@@ -658,6 +785,7 @@
 
     /* Responsive */
     @@media (max-width: 768px) {
+        .room-grid,
         .cards-grid {
             grid-template-columns: 1fr;
         }
@@ -675,23 +803,25 @@
 </style>
 
 @code {
-    private List<Room> RoomsForCleaning = new();
-    private List<Room> RoomsUnderMaintenance = new();
+    private List<HestiaLink.Models.Room> RoomsForCleaning = new();
+    private List<HestiaLink.Models.Room> RoomsUnderMaintenance = new();
     private List<CleaningTask> ActiveTasks = new();
     private List<SystemUser> AvailableHousekeepers = new();
 
     private string ActiveTab = "cleaning";
     private bool ShowAssignModal = false;
     private bool ShowAdminCompleteModal = false;
+    private bool ShowResolveMaintenanceModal = false;
     private bool IsLoaded = false;
     private bool HasError = false;
     private bool IsProcessing = false;
     private string ErrorMessage = string.Empty;
 
-    private Room? SelectedRoom;
+    private HestiaLink.Models.Room? SelectedRoom;
     private CleaningTask? SelectedTask;
     private int SelectedUserID = 0;
     private string TaskNotes = "Standard Cleaning";
+    private string MaintenanceNotes = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -845,8 +975,10 @@
         }
     }
 
-    private async Task ResolveMaintenanceRoom(Room room)
+    private async Task MarkRoomClean(Room room)
     {
+        if (room == null || IsProcessing) return;
+
         try
         {
             IsProcessing = true;
@@ -857,7 +989,83 @@
             if (success)
             {
                 await LoadData();
-                await JSRuntime.InvokeVoidAsync("alert", $"Room {room.RoomNumber} is now available!");
+                await JSRuntime.InvokeVoidAsync("alert", $"Room {room.RoomNumber} marked clean.");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to update room status.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task MarkRoomMaintenance(Room room)
+    {
+        if (room == null || IsProcessing) return;
+
+        try
+        {
+            IsProcessing = true;
+            StateHasChanged();
+
+            var success = await HousekeepingService.UpdateRoomStatusAsync(room.RoomID, "Maintenance");
+
+            if (success)
+            {
+                await LoadData();
+                await JSRuntime.InvokeVoidAsync("alert", $"Room {room.RoomNumber} moved to maintenance.");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to update room status.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ResolveMaintenanceRoom(Room room)
+    {
+        SelectedRoom = room;
+        MaintenanceNotes = "";
+        ShowResolveMaintenanceModal = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmResolveMaintenance()
+    {
+        if (SelectedRoom == null || IsProcessing) return;
+
+        try
+        {
+            IsProcessing = true;
+            StateHasChanged();
+
+            // Note: MaintenanceNotes are collected but not currently stored due to schema limitations.
+            // In a future update, we should save these to a MaintenanceLog table.
+
+            var success = await HousekeepingService.UpdateRoomStatusAsync(SelectedRoom.RoomID, "Available");
+
+            if (success)
+            {
+                ShowResolveMaintenanceModal = false;
+                await LoadData();
+                await JSRuntime.InvokeVoidAsync("alert", $"Room {SelectedRoom.RoomNumber} issue resolved and marked available!");
             }
             else
             {

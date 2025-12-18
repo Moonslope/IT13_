@@ -11,26 +11,27 @@ namespace HestiaLink.Services
     /// </summary>
     public class HousekeepingService
     {
-        private readonly HestiaLinkContext _context;
+        private readonly IDbContextFactory<HestiaLinkContext> _factory;
 
-        public HousekeepingService(HestiaLinkContext context)
+        public HousekeepingService(IDbContextFactory<HestiaLinkContext> factory)
         {
-            _context = context;
+            _factory = factory;
         }
 
         #region Room Operations
 
         /// <summary>
-        /// Gets all rooms that require cleaning (Status = 'For Cleaning')
+        /// Gets all rooms that require cleaning (Status = 'For Cleaning' or legacy 'Dirty')
         /// </summary>
         public async Task<List<Room>> GetRoomsForCleaningAsync()
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                return await _context.Rooms
+                return await context.Rooms
                     .AsNoTracking()
                     .Include(r => r.RoomType)
-                    .Where(r => r.Status == "For Cleaning")
+                    .Where(r => r.Status == "For Cleaning" || r.Status == "Dirty")
                     .OrderBy(r => r.RoomNumber)
                     .ToListAsync();
             }
@@ -38,27 +39,27 @@ namespace HestiaLink.Services
             {
                 Console.WriteLine($"Error getting rooms for cleaning: {ex.Message}");
                 // Fallback to raw SQL if EF fails
-                return await GetRoomsForCleaningRawAsync();
+                return await GetRoomsForCleaningRawAsync(context);
             }
         }
 
-        private async Task<List<Room>> GetRoomsForCleaningRawAsync()
+        private async Task<List<Room>> GetRoomsForCleaningRawAsync(HestiaLinkContext context)
         {
             var rooms = new List<Room>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
                 using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT r.RoomID, r.RoomNumber, r.Floor, r.Status, r.RoomTypeID,
-                           rt.TypeName
-                    FROM Room r
-                    LEFT JOIN RoomType rt ON r.RoomTypeID = rt.RoomTypeID
-                    WHERE r.Status = 'For Cleaning'
-                    ORDER BY r.RoomNumber";
+                  cmd.CommandText = @"
+                      SELECT r.RoomID, r.RoomNumber, r.Floor, r.Status, r.RoomTypeID,
+                          rt.TypeName
+                      FROM Room r
+                      LEFT JOIN RoomType rt ON r.RoomTypeID = rt.RoomTypeID
+                      WHERE r.Status IN ('For Cleaning', 'Dirty')
+                      ORDER BY r.RoomNumber";
 
                 using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -92,9 +93,10 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<Room>> GetRoomsUnderMaintenanceAsync()
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                return await _context.Rooms
+                return await context.Rooms
                     .AsNoTracking()
                     .Include(r => r.RoomType)
                     .Where(r => r.Status == "Maintenance")
@@ -113,11 +115,22 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<bool> UpdateRoomStatusAsync(int roomId, string newStatus)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                // Use raw SQL to avoid any column issues
+                // First, try to find and detach any tracked instance of this room
+                var trackedRoom = context.ChangeTracker.Entries<Room>()
+                    .FirstOrDefault(e => e.Entity.RoomID == roomId);
+                
+                if (trackedRoom != null)
+                {
+                    context.Entry(trackedRoom.Entity).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+                }
+
+                // Use raw SQL to update
                 var sql = "UPDATE Room SET Status = {0} WHERE RoomID = {1}";
-                var result = await _context.Database.ExecuteSqlRawAsync(sql, newStatus, roomId);
+                var result = await context.Database.ExecuteSqlRawAsync(sql, newStatus, roomId);
+                
                 return result > 0;
             }
             catch (Exception ex)
@@ -137,25 +150,26 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<SystemUser>> GetAvailableHousekeepersAsync()
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
                 // First try raw SQL approach which is more reliable
-                return await GetHousekeepingStaffRawAsync(availableOnly: true);
+                return await GetHousekeepingStaffRawAsync(context, availableOnly: true);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAvailableHousekeepersAsync: {ex.Message}");
                 // Last resort - return all housekeeping staff
-                return await GetAllHousekeepingStaffRawAsync();
+                return await GetAllHousekeepingStaffRawAsync(context);
             }
         }
 
-        private async Task<List<SystemUser>> GetHousekeepingStaffRawAsync(bool availableOnly = true)
+        private async Task<List<SystemUser>> GetHousekeepingStaffRawAsync(HestiaLinkContext context, bool availableOnly = true)
         {
             var users = new List<SystemUser>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -212,7 +226,7 @@ namespace HestiaLink.Services
                 if (users.Count == 0 && availableOnly)
                 {
                     Console.WriteLine("No available staff found, getting all housekeeping staff...");
-                    return await GetAllHousekeepingStaffRawAsync();
+                    return await GetAllHousekeepingStaffRawAsync(context);
                 }
             }
             catch (Exception ex)
@@ -222,12 +236,12 @@ namespace HestiaLink.Services
             return users;
         }
 
-        private async Task<List<SystemUser>> GetAllHousekeepingStaffRawAsync()
+        private async Task<List<SystemUser>> GetAllHousekeepingStaffRawAsync(HestiaLinkContext context)
         {
             var users = new List<SystemUser>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -270,9 +284,10 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<SystemUser>> GetAllHousekeepingStaffAsync()
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                return await GetAllHousekeepingStaffRawAsync();
+                return await GetAllHousekeepingStaffRawAsync(context);
             }
             catch (Exception ex)
             {
@@ -289,9 +304,10 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<(bool Success, string Message, CleaningTask? Task)> AssignTaskAsync(int roomId, int userId, string? notes = null)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -309,6 +325,7 @@ namespace HestiaLink.Services
                     roomCmd.Parameters.Add(roomIdParam);
 
                     string? roomNumber = null;
+                    string roomStatus = string.Empty;
                     using (var reader = await roomCmd.ExecuteReaderAsync())
                     {
                         if (!await reader.ReadAsync())
@@ -316,13 +333,28 @@ namespace HestiaLink.Services
                             transaction.Rollback();
                             return (false, "Room not found", null);
                         }
-                        var status = reader.GetString(reader.GetOrdinal("Status"));
-                        if (status != "For Cleaning")
-                        {
-                            transaction.Rollback();
-                            return (false, "Room is not marked for cleaning", null);
-                        }
+
+                        roomStatus = reader.GetString(reader.GetOrdinal("Status"));
                         roomNumber = reader.GetString(reader.GetOrdinal("RoomNumber"));
+                    }
+
+                    var isCleaningStatus = roomStatus == "For Cleaning" || roomStatus == "Dirty";
+                    if (!isCleaningStatus)
+                    {
+                        transaction.Rollback();
+                        return (false, "Room is not marked for cleaning", null);
+                    }
+
+                    if (roomStatus == "Dirty")
+                    {
+                        using var normalizeCmd = conn.CreateCommand();
+                        normalizeCmd.Transaction = transaction;
+                        normalizeCmd.CommandText = "UPDATE Room SET Status = 'For Cleaning' WHERE RoomID = @RoomID";
+                        var normalizeParam = normalizeCmd.CreateParameter();
+                        normalizeParam.ParameterName = "@RoomID";
+                        normalizeParam.Value = roomId;
+                        normalizeCmd.Parameters.Add(normalizeParam);
+                        await normalizeCmd.ExecuteNonQueryAsync();
                     }
 
                     // Validate user
@@ -471,12 +503,13 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<CleaningTask>> GetActiveTasksAsync()
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                return await _context.CleaningTasks
+                return await context.CleaningTasks
                     .AsNoTracking()
-                    .Include(t => t.Room)
-                        .ThenInclude(r => r.RoomType)
+                    .Include(t => t.Room!)
+                        .ThenInclude(r => r!.RoomType)
                     .Include(t => t.AssignedUser)
                     .Where(t => t.Status == "Assigned" || t.Status == "In Progress")
                     .OrderByDescending(t => t.AssignedDate)
@@ -485,16 +518,16 @@ namespace HestiaLink.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"EF query failed for GetActiveTasksAsync: {ex.Message}");
-                return await GetActiveTasksRawAsync();
+                return await GetActiveTasksRawAsync(context);
             }
         }
 
-        private async Task<List<CleaningTask>> GetActiveTasksRawAsync()
+        private async Task<List<CleaningTask>> GetActiveTasksRawAsync(HestiaLinkContext context)
         {
             var tasks = new List<CleaningTask>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -606,12 +639,13 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<CleaningTask>> GetUserTasksAsync(int userId, bool activeOnly = true)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                var query = _context.CleaningTasks
+                var query = context.CleaningTasks
                     .AsNoTracking()
-                    .Include(t => t.Room)
-                        .ThenInclude(r => r.RoomType)
+                    .Include(t => t.Room!)
+                        .ThenInclude(r => r!.RoomType)
                     .Where(t => t.UserID == userId);
 
                 if (activeOnly)
@@ -627,19 +661,19 @@ namespace HestiaLink.Services
             {
                 Console.WriteLine($"EF query failed for GetUserTasksAsync: {ex.Message}");
                 // Fallback to raw SQL
-                return await GetUserTasksRawAsync(userId, activeOnly);
+                return await GetUserTasksRawAsync(context, userId, activeOnly);
             }
         }
 
         /// <summary>
         /// Fallback method to get user tasks using raw SQL
         /// </summary>
-        private async Task<List<CleaningTask>> GetUserTasksRawAsync(int userId, bool activeOnly)
+        private async Task<List<CleaningTask>> GetUserTasksRawAsync(HestiaLinkContext context, int userId, bool activeOnly)
         {
             var tasks = new List<CleaningTask>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -754,12 +788,13 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<List<CleaningTask>> GetUserTaskHistoryAsync(int userId)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                return await _context.CleaningTasks
+                return await context.CleaningTasks
                     .AsNoTracking()
-                    .Include(t => t.Room)
-                        .ThenInclude(r => r.RoomType)
+                    .Include(t => t.Room!)
+                        .ThenInclude(r => r!.RoomType)
                     .Where(t => t.UserID == userId && t.Status == "Completed")
                     .OrderByDescending(t => t.CompletedDate)
                     .ToListAsync();
@@ -768,19 +803,19 @@ namespace HestiaLink.Services
             {
                 Console.WriteLine($"EF query failed for GetUserTaskHistoryAsync: {ex.Message}");
                 // Fallback to raw SQL
-                return await GetUserTaskHistoryRawAsync(userId);
+                return await GetUserTaskHistoryRawAsync(context, userId);
             }
         }
 
         /// <summary>
         /// Fallback method to get user task history using raw SQL
         /// </summary>
-        private async Task<List<CleaningTask>> GetUserTaskHistoryRawAsync(int userId)
+        private async Task<List<CleaningTask>> GetUserTaskHistoryRawAsync(HestiaLinkContext context, int userId)
         {
             var tasks = new List<CleaningTask>();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -887,10 +922,11 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<(bool Success, string Message)> StartTaskAsync(int taskId, int userId)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
                 var sql = "UPDATE Task SET Status = 'In Progress' WHERE TaskID = {0} AND UserID = {1}";
-                var result = await _context.Database.ExecuteSqlRawAsync(sql, taskId, userId);
+                var result = await context.Database.ExecuteSqlRawAsync(sql, taskId, userId);
                 return result > 0 ? (true, "Task started successfully") : (false, "Task not found or not assigned to you");
             }
             catch (Exception ex)
@@ -905,9 +941,10 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<(bool Success, string Message)> CompleteTaskAsync(int taskId, int userId, string completionType)
         {
+            using var context = await _factory.CreateDbContextAsync();
             try
             {
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -1039,11 +1076,12 @@ namespace HestiaLink.Services
         public async Task<TaskStatistics> GetTaskStatisticsAsync()
         {
             var stats = new TaskStatistics();
+            using var context = await _factory.CreateDbContextAsync();
             
             try
             {
                 // Use raw SQL to avoid column issues
-                var conn = _context.Database.GetDbConnection();
+                var conn = context.Database.GetDbConnection();
                 if (conn.State != ConnectionState.Open)
                     await conn.OpenAsync();
 
@@ -1085,7 +1123,7 @@ namespace HestiaLink.Services
                 using var roomCmd = conn.CreateCommand();
                 roomCmd.CommandText = @"
                     SELECT 
-                        SUM(CASE WHEN Status = 'For Cleaning' THEN 1 ELSE 0 END) AS ForCleaning,
+                        SUM(CASE WHEN Status IN ('For Cleaning', 'Dirty') THEN 1 ELSE 0 END) AS ForCleaning,
                         SUM(CASE WHEN Status = 'Maintenance' THEN 1 ELSE 0 END) AS Maintenance
                     FROM Room";
                 

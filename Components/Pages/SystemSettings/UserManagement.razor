@@ -1,9 +1,9 @@
 @page "/settings/user-management"
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
 @using System.Data
 @inject HestiaLinkContext Context
 @inject IJSRuntime JSRuntime
-@layout MainLayout
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -18,7 +18,7 @@
     @if (!string.IsNullOrEmpty(ErrorMessage))
     {
         <div class="error-banner">
-            <span class="error-icon">⚠️</span>
+            <span class="error-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></span>
             <span class="error-message">@ErrorMessage</span>
             <button class="error-close" @onclick="ClearError">×</button>
         </div>
@@ -34,14 +34,14 @@
     }
 
     <section class="page-content">
+        <!-- Toolbar Section -->
         <div class="user-toolbar">
             <div class="toolbar-left">
                 <div class="toolbar-search">
-                    <input type="text" placeholder="Search users by name, ID, role, or employee ID..."
+                    <input type="text" placeholder="Search by name, ID, role, or employee ID..."
                            @bind="SearchText"
                            @oninput="OnSearchChanged"
                            @onkeydown="HandleKeyDown" />
-                    <span class="search-icon">🔍</span>
                     @if (!string.IsNullOrEmpty(SearchText))
                     {
                         <button class="clear-search" @onclick="ClearSearch" title="Clear search">
@@ -65,9 +65,9 @@
                     <option value="UserId">Sort by User ID</option>
                 </select>
             </div>
-            <div>
+            <div class="toolbar-right">
                 <button class="btn-secondary" @onclick="OpenArchivedModal" disabled="@(!IsLoaded || IsProcessing)">
-                     View Archived (@ArchivedUsersCount)
+                    View Archived (@ArchivedUsersCount)
                 </button>
                 <button class="btn-create" @onclick="OpenCreateModal" disabled="@(!IsLoaded || IsProcessing)">
                     New User
@@ -146,7 +146,7 @@
             else if (IsLoaded)
             {
                 <div class="no-users-message">
-                    <div class="no-users-icon">👤</div>
+                    <div class="no-users-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
                     <h3>No users found</h3>
                     <p>
                         @if (!string.IsNullOrEmpty(SearchText))
@@ -254,7 +254,7 @@
     <div class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.4rem;">📦 Archived Users</h2>
+                <h2 style="margin:0; font-size:1.4rem;"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg> Archived Users</h2>
                 <div style="font-size: 0.9rem; color: rgba(255,255,255,0.8); margin-top: 4px;">@ArchivedUsers.Count archived users</div>
             </div>
 
@@ -282,7 +282,7 @@
                                     <td style="text-align:center;">
                                         <button class="btn-secondary" style="background:#10b981; color: white;" 
                                                 @onclick="() => RestoreUser(user)" disabled="@IsProcessing">
-                                            ✅ Restore
+                                            <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Restore
                                         </button>
                                     </td>
                                 </tr>
@@ -309,7 +309,7 @@
     <div class="modal-overlay">
         <div class="modal-content" style="max-width:420px;">
             <div class="modal-header-teal">
-                <h2 style="margin:0; font-size:1.2rem;">⚠️ Confirm Archive</h2>
+                <h2 style="margin:0; font-size:1.2rem;"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg> Confirm Archive</h2>
             </div>
             <div style="padding:20px;">
                 <p>Are you sure you want to archive user <strong>@(ArchiveTarget?.Username)</strong>?</p>
@@ -329,6 +329,24 @@
     </div>
 }
 
+<!-- Custom Alert Modal -->
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem;">Notification</h2>
+            </div>
+            <div style="padding:20px;">
+                <p>@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText { get; set; } = "";
     private string FilterRole { get; set; } = "All";
@@ -339,6 +357,10 @@
     private bool IsLoaded = false;
     private bool IsProcessing = false;
     private string ErrorMessage = string.Empty;
+
+    // Alert Modal State
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     private SystemUser? SelectedUser;
     private SystemUser CurrentUser = new();
@@ -1068,15 +1090,16 @@
 
     private async Task ShowAlert(string message)
     {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("alert", message);
-        }
-        catch
-        {
-            ErrorMessage = message;
-            StateHasChanged();
-        }
+        AlertMessage = message;
+        ShowAlertModal = true;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
+        StateHasChanged();
     }
 
     public void Dispose()
@@ -1087,31 +1110,10 @@
 
 <style>
     /* ... existing styles ... */
-    .page-wrapper {
-        padding: 20px;
-        background: #f8fafc;
-        min-height: 100vh;
-    }
-
-    .page-topbar {
-        margin-bottom: 24px;
-    }
-
-    .page-topbar h1 {
-        margin: 0;
-        color: #0f766e;
-        font-size: 1.8rem;
-    }
-
-    .page-topbar-subtitle {
-        color: #64748b;
-        font-size: 0.9rem;
-    }
-
     .error-banner {
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-        color: #dc2626;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        color: #991b1b;
         padding: 12px 16px;
         border-radius: 6px;
         margin: 0 0 16px 0;
@@ -1120,23 +1122,37 @@
         gap: 8px;
     }
 
-    .error-icon { font-size: 1.2em; }
-    .error-message { flex: 1; }
+    .error-icon {
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .error-message {
+        flex: 1;
+        font-size: 0.875rem;
+    }
+
     .error-close {
         background: none;
         border: none;
-        font-size: 1.5em;
+        font-size: 1.2rem;
         cursor: pointer;
-        color: #dc2626;
+        color: #991b1b;
         padding: 0;
         width: 24px;
         height: 24px;
+        transition: opacity 0.2s;
+        flex-shrink: 0;
+    }
+
+    .error-close:hover {
+        opacity: 0.7;
     }
 
     .loading-overlay {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.95);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1147,7 +1163,7 @@
     .loading-spinner {
         width: 40px;
         height: 40px;
-        border: 4px solid #e2e8f0;
+        border: 4px solid #e5e7eb;
         border-top: 4px solid #0f766e;
         border-radius: 50%;
         animation: spin 1s linear infinite;
@@ -1157,8 +1173,8 @@
     .loading-spinner-small {
         width: 16px;
         height: 16px;
-        border: 2px solid rgba(255,255,255,0.3);
-        border-top: 2px solid #ffffff;
+        border: 2px solid rgba(15, 118, 110, 0.2);
+        border-top: 2px solid #0f766e;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         display: inline-block;
@@ -1170,11 +1186,20 @@
         justify-content: space-between;
         align-items: center;
         gap: 16px;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
         flex-wrap: wrap;
+        background: transparent;
     }
 
     .toolbar-left {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex: 1;
+        flex-wrap: wrap;
+    }
+
+    .toolbar-right {
         display: flex;
         gap: 12px;
         align-items: center;
@@ -1185,76 +1210,130 @@
         position: relative;
         display: flex;
         align-items: center;
+        flex: 1;
+        min-width: 200px;
     }
 
     .toolbar-search input {
-        padding: 10px 40px 10px 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        width: 320px;
-        font-size: 0.9rem;
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        background: white;
+        transition: border-color 0.2s;
+    }
+
+    .toolbar-search input:focus {
+        outline: none;
+        border-color: #0f766e;
+        box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
     }
 
     .search-icon {
         position: absolute;
         right: 12px;
-        color: #64748b;
+        color: #9ca3af;
     }
 
     .clear-search {
         position: absolute;
-        right: 35px;
+        right: 8px;
         background: none;
         border: none;
-        font-size: 1.2em;
+        font-size: 1.2rem;
         cursor: pointer;
-        color: #64748b;
+        color: #9ca3af;
         padding: 4px;
         border-radius: 50%;
         width: 24px;
         height: 24px;
+        transition: all 0.2s;
+    }
+
+    .clear-search:hover {
+        color: #6b7280;
+        background: rgba(107, 114, 128, 0.1);
     }
 
     .filter-select {
-        padding: 10px 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        font-size: 0.9rem;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
         background: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .filter-select:hover {
+        border-color: #9ca3af;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: #0f766e;
+        box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
     }
 
     .btn-create {
-        background: #0f766e;
+        background: #10b981;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
+        padding: 8px 16px;
+        border-radius: 6px;
         font-weight: 600;
         cursor: pointer;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        transition: all 0.2s;
     }
 
     .btn-create:hover:not(:disabled) {
-        background: #0d9488;
+        background: #059669;
+    }
+
+    .btn-create:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .btn-secondary {
-        background: white;
-        color: #475569;
-        border: 1px solid #e5e7eb;
-        padding: 10px 20px;
-        border-radius: 8px;
+        background: #6b7280;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
         font-weight: 600;
         cursor: pointer;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        transition: all 0.2s;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #4b5563;
+    }
+
+    .btn-secondary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .btn-primary {
         background: #0f766e;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
+        padding: 8px 16px;
+        border-radius: 6px;
         font-weight: 600;
         cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #0d9488;
     }
 
     .search-results-info {
@@ -1281,27 +1360,29 @@
 
     .user-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
     }
 
     .user-card {
         background: white;
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 10px;
+        padding: 18px;
         border: 1px solid #e5e7eb;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
     }
 
     .user-card:hover {
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border-color: #0f766e;
+        transform: translateY(-1px);
     }
 
     .user-card.selected-card {
         border-color: #0f766e;
-        box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+        background: #f0fdf4;
+        box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
     }
 
     .user-card-header {
@@ -1476,15 +1557,22 @@
     }
 
     .modal-header-teal {
-        background: linear-gradient(135deg, #0f766e, #064e3b);
+        background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
         color: white;
         padding: 20px 24px;
-        border-radius: 12px 12px 0 0;
+        border-radius: 10px 10px 0 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-header-teal h2 {
+        font-size: 1.25rem;
+        margin: 0;
     }
 
     .form-grid {
         padding: 24px;
         display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 16px;
     }
 
@@ -1501,14 +1589,26 @@
     .form-label {
         font-weight: 600;
         color: #374151;
-        font-size: 0.9rem;
+        font-size: 0.875rem;
     }
 
     .form-input, .form-select {
-        padding: 10px 12px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        font-size: 0.95rem;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        background: white;
+        transition: all 0.2s;
+    }
+
+    .form-input:hover, .form-select:hover {
+        border-color: #9ca3af;
+    }
+
+    .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: #0f766e;
+        box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
     }
 
     .action-footer {
@@ -1562,6 +1662,121 @@
         
         .user-grid {
             grid-template-columns: 1fr;
+        }
+
+        .toolbar-right {
+            flex-direction: column;
+        }
+
+        .toolbar-right button {
+            width: 100%;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .action-footer {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .action-footer button {
+            width: 100%;
+        }
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            transform: translateX(-4px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .slide-in {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    /* Ultra-small devices */
+    @@media (max-width: 480px) {
+        .page-wrapper {
+            padding: 12px;
+        }
+
+        .page-content {
+            padding: 12px;
+        }
+
+        .page-topbar {
+            padding: 12px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .page-topbar h1 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        .toolbar {
+            gap: 8px;
+            flex-direction: column;
+        }
+
+        .toolbar-search input {
+            width: 100%;
+            font-size: 16px;
+        }
+
+        .filter-select {
+            width: 100%;
+        }
+
+        .user-grid {
+            gap: 12px;
+            grid-template-columns: 1fr;
+        }
+
+        .user-card {
+            padding: 12px;
+        }
+
+        .user-header {
+            font-size: 1rem;
+        }
+
+        .modal-content {
+            width: 95vw;
+            max-width: 100%;
+        }
+
+        .form-label {
+            font-size: 0.8rem;
+        }
+
+        .form-input,
+        .form-select {
+            font-size: 16px;
         }
     }
 </style>

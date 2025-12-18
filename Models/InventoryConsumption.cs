@@ -6,12 +6,15 @@ namespace HestiaLink.Models
     public class InventoryConsumption
     {
         [Key]
+        [Column("ConsumptionID")]
         public int ConsumptionId { get; set; }
 
         [Required]
+        [Column("ServiceTransactionID")]
         public int ServiceTransactionId { get; set; }
 
         [Required]
+        [Column("InventoryItemID")]
         public int InventoryItemId { get; set; }
 
         [Required]

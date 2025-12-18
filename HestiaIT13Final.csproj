@@ -52,6 +52,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
@@ -66,6 +70,14 @@
       <MauiXaml Update="HestiaIT13Final\Pages\HomePage.xaml">
         <Generator>MSBuild:Compile</Generator>
       </MauiXaml>
+    </ItemGroup>
+
+    <!-- Exclude CloudApp folder from compilation -->
+    <ItemGroup>
+      <Compile Remove="CloudApp\**" />
+      <Content Remove="CloudApp\**" />
+      <EmbeddedResource Remove="CloudApp\**" />
+      <None Remove="CloudApp\**" />
     </ItemGroup>
 
 </Project>

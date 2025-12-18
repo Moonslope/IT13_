@@ -1,8 +1,9 @@
-﻿@page "/hr/position-setup"
+@page "/hr/position-setup"
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext Context
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
 @inject IJSRuntime JSRuntime
-@layout MainLayout
+@layout HestiaIT13Final.Components.Layout.MainLayout
 
 <div class="page-wrapper">
     <header class="page-topbar">
@@ -19,7 +20,6 @@
         <div class="toolbar-left">
             <div class="toolbar-search">
                 <input type="text" placeholder="Search positions..." @bind="SearchText" @bind:event="oninput" />
-                <span class="search-icon"></span>
             </div>
             <select class="filter-select" @bind="SelectedDepartmentFilter">
                 <option value="">All Departments</option>
@@ -76,7 +76,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var pos in FilteredPositions)
+                            @foreach (var pos in PaginatedPositions)
                             {
                                 <tr>
                                     <td>@pos.PositionId</td>
@@ -107,6 +107,14 @@
                             }
                         </tbody>
                     </table>
+                    @if (FilteredPositions.Count > 0)
+                    {
+                        <Pagination CurrentPage="@CurrentPage" 
+                                    TotalItems="@FilteredPositions.Count" 
+                                    ItemsPerPage="@ItemsPerPage"
+                                    OnPageChanged="@OnPageChanged"
+                                    OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                    }
                 }
                 else
                 {
@@ -272,6 +280,10 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = "";
+    
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
 
     private Position CurrentPos = new();
     private List<Position> Positions = new();
@@ -297,10 +309,11 @@
             HasError = false;
             ErrorMessage = string.Empty;
 
-            Departments = await Context.Departments.AsNoTracking().OrderBy(d => d.DepartmentName).ToListAsync();
+            using var context = ContextFactory.CreateDbContext();
+            Departments = await context.Departments.AsNoTracking().OrderBy(d => d.DepartmentName).ToListAsync();
 
             // Include Department navigation property
-            Positions = await Context.Positions
+            Positions = await context.Positions
                 .Include(p => p.Department)
                 .AsNoTracking()
                 .OrderBy(p => p.PositionTitle)
@@ -350,6 +363,28 @@
         }
     }
 
+    private List<Position> PaginatedPositions
+    {
+        get
+        {
+            var filtered = FilteredPositions;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
     private void OpenModal() { CurrentPos = new Position { Status = "Active" }; IsEditMode = false; ShowModal = true; }
     private void OpenEditModal(Position pos)
     {
@@ -374,12 +409,13 @@
     {
         try
         {
-            var entity = await Context.Positions.FindAsync(pos.PositionId);
+            using var context = ContextFactory.CreateDbContext();
+            var entity = await context.Positions.FindAsync(pos.PositionId);
             if (entity != null)
             {
                 entity.Status = "Archived";
-                Context.Positions.Update(entity);
-                await Context.SaveChangesAsync();
+                context.Positions.Update(entity);
+                await context.SaveChangesAsync();
 
                 var local = Positions.FirstOrDefault(p => p.PositionId == pos.PositionId);
                 if (local != null) local.Status = "Archived";
@@ -402,12 +438,13 @@
     {
         try
         {
-            var entity = await Context.Positions.FindAsync(pos.PositionId);
+            using var context = ContextFactory.CreateDbContext();
+            var entity = await context.Positions.FindAsync(pos.PositionId);
             if (entity != null)
             {
                 entity.Status = "Active";
-                Context.Positions.Update(entity);
-                await Context.SaveChangesAsync();
+                context.Positions.Update(entity);
+                await context.SaveChangesAsync();
 
                 var local = Positions.FirstOrDefault(p => p.PositionId == pos.PositionId);
                 if (local != null) local.Status = "Active";
@@ -438,11 +475,12 @@
     {
         try
         {
-            var entity = await Context.Positions.FindAsync(CurrentPosForDelete.PositionId);
+            using var context = ContextFactory.CreateDbContext();
+            var entity = await context.Positions.FindAsync(CurrentPosForDelete.PositionId);
             if (entity != null)
             {
-                Context.Positions.Remove(entity);
-                await Context.SaveChangesAsync();
+                context.Positions.Remove(entity);
+                await context.SaveChangesAsync();
 
                 Positions.RemoveAll(p => p.PositionId == CurrentPosForDelete.PositionId);
                 StateHasChanged();
@@ -466,9 +504,10 @@
 
         try
         {
+            using var context = ContextFactory.CreateDbContext();
             if (IsEditMode)
             {
-                var existing = await Context.Positions.FindAsync(CurrentPos.PositionId);
+                var existing = await context.Positions.FindAsync(CurrentPos.PositionId);
                 if (existing != null)
                 {
                     existing.DepartmentId = CurrentPos.DepartmentId;
@@ -478,8 +517,8 @@
                     existing.Salary = CurrentPos.Salary;
                     existing.JobDescription = CurrentPos.JobDescription;
                     existing.Status = CurrentPos.Status;
-                    Context.Positions.Update(existing);
-                    await Context.SaveChangesAsync();
+                    context.Positions.Update(existing);
+                    await context.SaveChangesAsync();
 
                     // update local copy
                     var local = Positions.FirstOrDefault(p => p.PositionId == existing.PositionId);
@@ -498,8 +537,8 @@
             }
             else
             {
-                Context.Positions.Add(CurrentPos);
-                await Context.SaveChangesAsync();
+                context.Positions.Add(CurrentPos);
+                await context.SaveChangesAsync();
                 await LoadData();
             }
 

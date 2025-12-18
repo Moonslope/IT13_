@@ -58,8 +58,12 @@ public partial class HestiaLinkContext : DbContext
     public virtual DbSet<VwTodaysRoomStatus> VwTodaysRoomStatuses { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code.
-        => optionsBuilder.UseSqlServer("Data Source=MSI\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30");
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseSqlServer("Data Source=JESTER-PC\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +71,7 @@ public partial class HestiaLinkContext : DbContext
         modelBuilder.Entity<OperationalExpense>(entity =>
         {
             entity.HasKey(e => e.ExpenseId);
+            entity.Property(e => e.ExpenseId).ValueGeneratedOnAdd();
             entity.ToTable("OperationalExpenses");
             entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.ExpenseDate).HasColumnType("datetime");
@@ -103,7 +108,7 @@ public partial class HestiaLinkContext : DbContext
 
         // Inventory tables
         modelBuilder.Entity<InventoryItem>().ToTable("InventoryItem");
-        modelBuilder.Entity<ServiceInventory>().ToTable("ServiceInventory");
+        // ServiceInventory table mapping is configured below with relationships
         modelBuilder.Entity<InventoryConsumption>().ToTable("InventoryConsumption");
         modelBuilder.Entity<Supplier>().ToTable("Supplier");
         modelBuilder.Entity<InventoryPurchase>().ToTable("InventoryPurchase");
@@ -149,17 +154,31 @@ public partial class HestiaLinkContext : DbContext
         });
 
         // Configure ServiceInventory Relationships
-        modelBuilder.Entity<ServiceInventory>()
-            .HasOne(si => si.Service)
-            .WithMany(s => s.ServiceInventories)
-            .HasForeignKey(si => si.ServiceId)
-            .OnDelete(DeleteBehavior.Restrict);
-        
-        modelBuilder.Entity<ServiceInventory>()
-            .HasOne(si => si.InventoryItem)
-            .WithMany()
-            .HasForeignKey(si => si.InventoryItemId)
-            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ServiceInventory>(entity =>
+        {
+            entity.ToTable("ServiceInventory");
+            
+            entity.Property(e => e.ServiceInventoryId)
+                .HasColumnName("ServiceInventoryID");
+            
+            entity.Property(e => e.ServiceId)
+                .HasColumnName("ServiceID");
+            
+            entity.Property(e => e.InventoryItemId)
+                .HasColumnName("InventoryItemID");
+            
+            entity.HasOne(si => si.Service)
+                .WithMany(s => s.ServiceInventories)
+                .HasForeignKey(si => si.ServiceId)
+                .HasConstraintName("FK_ServiceInventory_Service")
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(si => si.InventoryItem)
+                .WithMany(i => i.ServiceInventories)
+                .HasForeignKey(si => si.InventoryItemId)
+                .HasConstraintName("FK_ServiceInventory_InventoryItem")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         // Configure CleaningTask (Task) Relationships
         modelBuilder.Entity<CleaningTask>(entity =>

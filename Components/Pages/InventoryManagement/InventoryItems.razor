@@ -1,0 +1,522 @@
+@page "/inventory/stock-management"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject InventoryService InventoryService
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Inventory Items</h1>
+            <span class="page-topbar-subtitle">Stock Management</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <div class="page-content">
+        <div class="user-toolbar">
+            <div class="toolbar-left">
+                <div class="toolbar-search">
+                    <input type="text" placeholder="Search by code, name, or category..." @bind="SearchText" @oninput="OnSearchChanged" />
+                </div>
+                <select class="filter-select" @bind="FilterStatus">
+                    <option value="All">All Items</option>
+                    <option value="Active">Active Only</option>
+                    <option value="Inactive">Inactive Only</option>
+                    <option value="LowStock">Low Stock</option>
+                    <option value="OutOfStock">Out of Stock</option>
+                </select>
+            </div>
+            <div>
+                <button class="btn-create" @onclick="OpenModal">Create New Item</button>
+            </div>
+        </div>
+
+        @if (!IsLoaded)
+        {
+            <div class="loading">Loading inventory items...</div>
+        }
+        else if (HasError)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>@ErrorMessage</p>
+                <button class="btn-primary" @onclick="RetryLoad">Retry</button>
+            </div>
+        }
+        else
+        {
+            <div class="panel-card">
+                <div class="panel-body user-list-container">
+                    @if (FilteredItems.Any())
+                    {
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:center;">Item Code</th>
+                                    <th style="text-align:center;">Item Name</th>
+                                    <th style="text-align:center;">Category</th>
+                                    <th style="text-align:center;">Unit</th>
+                                    <th style="text-align:center;">Unit Cost</th>
+                                    <th style="text-align:center;">Current Stock</th>
+                                    <th style="text-align:center;">Reorder Point</th>
+                                    <th style="text-align:center;">Supplier</th>
+                                    <th style="text-align:center;">Service Category</th>
+                                    <th style="text-align:center;">Status</th>
+                                    <th style="text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in PaginatedItems)
+                                {
+                                    <tr>
+                                        <td style="font-family:monospace; font-weight:700; text-align:center;">@item.ItemCode</td>
+                                        <td style="font-weight:600; text-align:center;">@item.ItemName</td>
+                                        <td style="text-align:center;">@item.Category</td>
+                                        <td style="text-align:center;">@item.UnitOfMeasure</td>
+                                        <td style="text-align:center;">@item.UnitCost.ToString("C")</td>
+                                        <td style="text-align:center;">
+                                            @if ((item.CurrentStock ?? 0) <= (item.ReorderPoint ?? 0))
+                                            {
+                                                <span style="color: #f59e0b; font-weight: 700;">@(item.CurrentStock ?? 0)</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@(item.CurrentStock ?? 0)</span>
+                                            }
+                                        </td>
+                                        <td style="text-align:center;">@(item.ReorderPoint ?? 0)</td>
+                                        <td style="text-align:center;">@(item.Supplier?.SupplierName ?? "-")</td>
+                                        <td style="text-align:center;">@(item.ServiceCategory?.ServiceCategoryName ?? "-")</td>
+                                        <td style="text-align:center;">
+                                            @if ((item.IsActive ?? false))
+                                            {
+                                                <span class="badge-active">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-archived">Inactive</span>
+                                            }
+                                        </td>
+                                        <td style="text-align:center;">
+                                            <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
+                                                <button class="btn-icon-action edit" @onclick="() => OpenEditModal(item)" title="Edit">
+                                                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                                </button>
+                                                @if (item.IsActive == true)
+                                                {
+                                                    <button class="btn-icon-action archive" @onclick="() => DeactivateItem(item)" title="Deactivate">
+                                                        <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44l.8-.97zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55z"/></svg>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn-icon-action edit" @onclick="() => ActivateItem(item)" title="Activate">
+                                                        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (FilteredItems.Count > 0)
+                        {
+                            <Pagination CurrentPage="@CurrentPage" 
+                                        TotalItems="@FilteredItems.Count" 
+                                        ItemsPerPage="@ItemsPerPage"
+                                        OnPageChanged="@OnPageChanged"
+                                        OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="no-data">No inventory items found</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (ShowModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.4rem;">@(IsEditMode ? "Edit Inventory Item" : "Create New Inventory Item")</h2>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Item Code *</label>
+                    <input type="text" class="form-input" @bind="CurrentItem.ItemCode" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Item Name *</label>
+                    <input type="text" class="form-input" @bind="CurrentItem.ItemName" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Category *</label>
+                    <select class="form-select" @bind="CurrentItem.Category">
+                        <option value="">-- Select Category --</option>
+                        <option value="FOOD">Food</option>
+                        <option value="BEVERAGE">Beverage</option>
+                        <option value="AMENITY">Amenity</option>
+                        <option value="CLEANING">Cleaning</option>
+                        <option value="MAINTENANCE">Maintenance</option>
+                        <option value="LINEN">Linen</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unit of Measure *</label>
+                    <select class="form-select" @bind="CurrentItem.UnitOfMeasure">
+                        <option value="">-- Select Unit --</option>
+                        <option value="KG">Kilogram (KG)</option>
+                        <option value="L">Liter (L)</option>
+                        <option value="PC">Piece (PC)</option>
+                        <option value="BOX">Box</option>
+                        <option value="SET">Set</option>
+                        <option value="BOTTLE">Bottle</option>
+                        <option value="PACK">Pack</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Unit Cost *</label>
+                    <input type="number" step="0.01" class="form-input" @bind="CurrentItem.UnitCost" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Current Stock</label>
+                    <input type="number" class="form-input" @bind="CurrentItem.CurrentStock" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Reorder Point</label>
+                    <input type="number" class="form-input" @bind="CurrentItem.ReorderPoint" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Supplier</label>
+                    <select class="form-select" @bind="CurrentItem.SupplierID">
+                        <option value="">-- Select Supplier --</option>
+                        @foreach (var supplier in Suppliers)
+                        {
+                            <option value="@supplier.SupplierID">@supplier.SupplierName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Service Category</label>
+                    <select class="form-select" @bind="CurrentItem.ServiceCategoryId">
+                        <option value="">-- Select Service Category --</option>
+                        @foreach (var category in ServiceCategories)
+                        {
+                            <option value="@category.ServiceCategoryId">@category.ServiceCategoryName</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Is Service Item</label>
+                    <input type="checkbox" @bind="CurrentItem.IsServiceItem" />
+                </div>
+            </div>
+
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="SaveItem">@(IsEditMode ? "Update Item" : "Create Item")</button>
+                <button class="btn-secondary" @onclick="CloseModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CancelAction">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string SearchText = "";
+    private string FilterStatus = "Active";
+    private bool ShowModal = false;
+    private bool IsEditMode = false;
+    private bool IsLoaded = false;
+    private bool HasError = false;
+    private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private InventoryItem? ItemToDeactivate;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
+
+    // Pagination
+    private int CurrentPage = 1;
+    private int ItemsPerPage = 10;
+
+    private InventoryItem CurrentItem = new();
+    private List<InventoryItem> Items = new();
+    private List<Supplier> Suppliers = new();
+    private List<ServiceCategory> ServiceCategories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            HasError = false;
+            ErrorMessage = string.Empty;
+
+            using var context = ContextFactory.CreateDbContext();
+            
+            Items = await context.InventoryItems
+                .Include(i => i.Supplier)
+                .Include(i => i.ServiceCategory)
+                .AsNoTracking()
+                .OrderBy(i => i.ItemName)
+                .ToListAsync();
+
+            Suppliers = await context.Suppliers
+                .Where(s => s.IsActive == true)
+                .AsNoTracking()
+                .OrderBy(s => s.SupplierName)
+                .ToListAsync();
+
+            ServiceCategories = await context.ServiceCategories
+                .AsNoTracking()
+                .OrderBy(c => c.ServiceCategoryName)
+                .ToListAsync();
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = ex.Message;
+            ShowAlert($"Database Error: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        IsLoaded = false;
+        StateHasChanged();
+        await Task.Delay(500);
+        await LoadData();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private List<InventoryItem> FilteredItems
+    {
+        get
+        {
+            var list = Items.ToList();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                var search = SearchText.Trim();
+                list = list.Where(i =>
+                    i.ItemCode.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    i.ItemName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    i.Category.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (FilterStatus == "Active")
+                list = list.Where(i => i.IsActive == true).ToList();
+            else if (FilterStatus == "Inactive")
+                list = list.Where(i => i.IsActive != true).ToList();
+            else if (FilterStatus == "LowStock")
+                list = list.Where(i => (i.CurrentStock ?? 0) <= (i.ReorderPoint ?? 0) && (i.CurrentStock ?? 0) > 0).ToList();
+            else if (FilterStatus == "OutOfStock")
+                list = list.Where(i => (i.CurrentStock ?? 0) == 0).ToList();
+
+            return list.OrderBy(i => i.ItemName).ToList();
+        }
+    }
+
+    private List<InventoryItem> PaginatedItems
+    {
+        get
+        {
+            var filtered = FilteredItems;
+            return filtered.Skip((CurrentPage - 1) * ItemsPerPage).Take(ItemsPerPage).ToList();
+        }
+    }
+
+    private void OnPageChanged(int page)
+    {
+        CurrentPage = page;
+        StateHasChanged();
+    }
+
+    private void OnItemsPerPageChanged(int itemsPerPage)
+    {
+        ItemsPerPage = itemsPerPage;
+        CurrentPage = 1;
+        StateHasChanged();
+    }
+
+    private void OpenModal()
+    {
+        CurrentItem = new InventoryItem 
+        { 
+            IsActive = true, 
+            CurrentStock = 0, 
+            ReorderPoint = 10,
+            CreatedDate = DateTime.Now,
+            IsServiceItem = false
+        };
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void CloseModal() { ShowModal = false; }
+
+    private void OpenEditModal(InventoryItem item)
+    {
+        CurrentItem = new InventoryItem
+        {
+            ItemId = item.ItemId,
+            ItemCode = item.ItemCode,
+            ItemName = item.ItemName,
+            Category = item.Category,
+            UnitOfMeasure = item.UnitOfMeasure,
+            UnitCost = item.UnitCost,
+            CurrentStock = item.CurrentStock,
+            ReorderPoint = item.ReorderPoint,
+            SupplierID = item.SupplierID,
+            ServiceCategoryId = item.ServiceCategoryId,
+            IsServiceItem = item.IsServiceItem,
+            IsActive = item.IsActive
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private async Task SaveItem()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(CurrentItem.ItemCode) || 
+                string.IsNullOrWhiteSpace(CurrentItem.ItemName) || 
+                CurrentItem.CurrentStock == null || 
+                CurrentItem.ReorderPoint == null ||
+                CurrentItem.SupplierID == null || 
+                CurrentItem.SupplierID == 0)
+            {
+                ShowAlert("Please fill in all required fields (Code, Name, Stock, Reorder Point, Supplier).");
+                return;
+            }
+
+            if (IsEditMode)
+            {
+                await InventoryService.UpdateItemAsync(CurrentItem);
+            }
+            else
+            {
+                await InventoryService.CreateItemAsync(CurrentItem);
+            }
+
+            CloseModal();
+            await LoadData();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error saving item: {ex.Message}");
+        }
+    }
+
+    private void DeactivateItem(InventoryItem item)
+    {
+        ItemToDeactivate = item;
+        ConfirmMessage = $"Are you sure you want to deactivate {item.ItemName}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (ItemToDeactivate != null)
+        {
+            await InventoryService.DeactivateItemAsync(ItemToDeactivate.ItemId);
+            await LoadData();
+            StateHasChanged();
+        }
+        ShowConfirmModal = false;
+        ItemToDeactivate = null;
+    }
+
+    private void CancelAction()
+    {
+        ShowConfirmModal = false;
+        ItemToDeactivate = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
+    }
+
+    private async Task ActivateItem(InventoryItem item)
+    {
+        await InventoryService.ReactivateItemAsync(item.ItemId);
+        await LoadData();
+        StateHasChanged();
+    }
+}
+

@@ -7,6 +7,7 @@ namespace HestiaIT13Final
 {
     public static class MauiProgram
     {
+#pragma warning disable CA1416
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
@@ -35,9 +36,20 @@ namespace HestiaIT13Final
             builder.Services.AddScoped<HousekeepingService>();
 
             // Add database context with connection string
-            var connectionString = "Data Source=JESTER-PC\\SQLEXPRESS;Initial Catalog=\"IT13 (1)\";Integrated Security=True;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False";
+            var connectionString = "Data Source=JESTER-PC\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False";
             
+            // Register DbContext for services that need scoped instances
             builder.Services.AddDbContext<HestiaLinkContext>(options =>
+                options.UseSqlServer(connectionString,
+                sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorNumbersToAdd: null
+                )));
+            
+            // Register DbContextFactory for components to avoid threading issues
+            // This ensures each operation gets its own context instance
+            builder.Services.AddDbContextFactory<HestiaLinkContext>(options =>
                 options.UseSqlServer(connectionString,
                 sqlServerOptions => sqlServerOptions.EnableRetryOnFailure(
                     maxRetryCount: 5,
@@ -66,5 +78,6 @@ namespace HestiaIT13Final
 
             return app;
         }
+#pragma warning restore CA1416
     }
 }
