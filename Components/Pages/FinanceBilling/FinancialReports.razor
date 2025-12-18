@@ -18,7 +18,7 @@
     <section class="page-content">
         <!-- Filter Section -->
         <div class="filter-bar">
-            <div class="filter-group">
+            <div class="filter-group" style="min-width: 200px;">
                 <label>Period</label>
                 <select class="form-select" @bind="SelectedPeriod" @bind:after="OnPeriodChanged">
                     <option value="today">Today</option>
@@ -62,7 +62,22 @@
                 </div>
                 <div class="hero-stat-value">&#8369;@TotalRevenue.ToString("N2")</div>
                 <div class="hero-stat-label">Total Revenue</div>
-                <div class="hero-stat-change">@BillSummary.Count Transactions</div>
+                <div class="hero-stat-change">
+                    @if (TotalRevenue > PreviousPeriodRevenue)
+                    {
+                        <span style="color: #6ee7b7;">↑ ₱@((TotalRevenue - PreviousPeriodRevenue).ToString("N0"))</span>
+                        <span>vs previous period</span>
+                    }
+                    else if (TotalRevenue < PreviousPeriodRevenue)
+                    {
+                        <span style="color: #fca5a5;">↓ ₱@((PreviousPeriodRevenue - TotalRevenue).ToString("N0"))</span>
+                        <span>vs previous period</span>
+                    }
+                    else
+                    {
+                        <span>Same as previous period</span>
+                    }
+                </div>
             </div>
             <div class="hero-stat">
                 <div class="hero-stat-icon">
@@ -70,7 +85,22 @@
                 </div>
                 <div class="hero-stat-value">&#8369;@TotalPayments.ToString("N2")</div>
                 <div class="hero-stat-label">Total Payments</div>
-                <div class="hero-stat-change">Amount collected</div>
+                <div class="hero-stat-change">
+                    @if (TotalPayments > PreviousPeriodPayments)
+                    {
+                        <span style="color: #6ee7b7;">↑ ₱@((TotalPayments - PreviousPeriodPayments).ToString("N0"))</span>
+                        <span>vs previous period</span>
+                    }
+                    else if (TotalPayments < PreviousPeriodPayments)
+                    {
+                        <span style="color: #fca5a5;">↓ ₱@((PreviousPeriodPayments - TotalPayments).ToString("N0"))</span>
+                        <span>vs previous period</span>
+                    }
+                    else
+                    {
+                        <span>Same as previous period</span>
+                    }
+                </div>
             </div>
             <div class="hero-stat">
                 <div class="hero-stat-icon">
@@ -87,6 +117,31 @@
                 <div class="hero-stat-value">&#8369;@TotalTaxCollected.ToString("N2")</div>
                 <div class="hero-stat-label">Tax Collected</div>
                 <div class="hero-stat-change">VAT + Service Charge</div>
+            </div>
+        </div>
+
+        <!-- Revenue Trends Chart -->
+        <div class="premium-card" style="margin-bottom:24px;">
+            <div class="premium-card-header">
+                <h3 class="premium-card-title">
+                    <span class="card-icon">
+                        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+                    </span>
+                    Revenue Trends
+                </h3>
+                <span class="range-note">@StartDate.ToString("MMM dd") - @EndDate.ToString("MMM dd, yyyy")</span>
+            </div>
+            <div class="premium-card-body">
+                @if (DailyRevenue.Any())
+                {
+                    <div class="chart-container" style="height: 280px;">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">No revenue data for the selected period.</div>
+                }
             </div>
         </div>
 
@@ -506,6 +561,10 @@
     private List<Bill> BillSummary = new();
     private List<Payment> PaymentHistory = new();
     
+    // Analytics data
+    private List<DailyRevenueData> DailyRevenue = new();
+    private List<PaymentMethodData> PaymentMethodBreakdown = new();
+    
     // Pagination for Payment History
     private int CurrentPaymentPage = 1;
     private int PaymentsPerPage = 10;
@@ -539,6 +598,10 @@
     private decimal ServiceChargeCollected => PaidSubtotal * 0.10m;
     private decimal TotalTaxCollected => VATCollected + ServiceChargeCollected;
     private decimal PayrollTaxWithheld = 0;
+    
+    // Previous period comparison data
+    private decimal PreviousPeriodRevenue = 0;
+    private decimal PreviousPeriodPayments = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -569,6 +632,46 @@
         else if (ActiveTab != "revenue")
         {
             _chartRendered = false; // Reset when leaving revenue tab
+        }
+        
+        // Render new analytics charts
+        await RenderAnalyticsCharts();
+    }
+    
+    private async Task RenderAnalyticsCharts()
+    {
+        try
+        {
+            // Revenue Trends Line Chart
+            if (DailyRevenue.Any())
+            {
+                var labels = DailyRevenue.Select(d => d.Date.ToString("MMM dd")).ToArray();
+                var data = DailyRevenue.Select(d => (double)d.Revenue).ToArray();
+                await JSRuntime.InvokeVoidAsync("chartHelper.renderLineChart",
+                    "revenueTrendChart",
+                    labels,
+                    data,
+                    "Revenue",
+                    "#0f766e",
+                    "rgba(15, 118, 110, 0.1)");
+            }
+            
+            // Payment Method Doughnut Chart
+            if (ActiveTab == "payments" && PaymentMethodBreakdown.Any())
+            {
+                var methodLabels = PaymentMethodBreakdown.Select(m => m.Method).ToArray();
+                var methodData = PaymentMethodBreakdown.Select(m => (double)m.Total).ToArray();
+                var colors = new[] { "#0d9488", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4" };
+                await JSRuntime.InvokeVoidAsync("chartHelper.renderDoughnutChart",
+                    "paymentMethodChart",
+                    methodLabels,
+                    methodData,
+                    colors);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rendering analytics charts: {ex.Message}");
         }
     }
 
@@ -632,6 +735,13 @@
                             p.PeriodEnd <= DateOnly.FromDateTime(EndDate))
                 .ToListAsync();
             PayrollTaxWithheld = payrolls.Sum(p => p.TaxAmount ?? 0);
+            
+            // Calculate analytics data
+            CalculateDailyRevenue();
+            CalculatePaymentMethodBreakdown();
+            
+            // Calculate previous period comparisons
+            await CalculatePreviousPeriodData();
         }
         catch (Exception ex)
         {
@@ -679,5 +789,86 @@
         var guest = bill.Reservation?.Guest;
         if (guest == null) return "N/A";
         return $"{guest.FirstName} {guest.LastName}";
+    }
+    
+    private void CalculateDailyRevenue()
+    {
+        DailyRevenue.Clear();
+        var days = (int)(EndDate - StartDate).TotalDays + 1;
+        
+        for (int i = 0; i < days; i++)
+        {
+            var date = StartDate.AddDays(i);
+            var dayRevenue = BillSummary
+                .Where(b => b.BillDate.HasValue && b.BillDate.Value.Date == date.Date)
+                .Sum(b => b.AmountPaid ?? 0);
+            
+            DailyRevenue.Add(new DailyRevenueData
+            {
+                Date = date,
+                Revenue = dayRevenue
+            });
+        }
+    }
+    
+    private void CalculatePaymentMethodBreakdown()
+    {
+        PaymentMethodBreakdown.Clear();
+        
+        var grouped = PaymentHistory
+            .GroupBy(p => p.PaymentMethod ?? "Unknown")
+            .Select(g => new PaymentMethodData
+            {
+                Method = g.Key,
+                Count = g.Count(),
+                Total = g.Sum(p => p.Amount ?? 0)
+            })
+            .OrderByDescending(p => p.Total)
+            .ToList();
+        
+        PaymentMethodBreakdown = grouped;
+    }
+    
+    private async Task CalculatePreviousPeriodData()
+    {
+        try
+        {
+            // Calculate previous period dates
+            var periodDays = (EndDate - StartDate).Days;
+            var previousStart = StartDate.AddDays(-(periodDays + 1));
+            var previousEnd = StartDate.AddDays(-1);
+            
+            // Get previous period revenue
+            var previousBills = await _context.Bills
+                .Where(b => b.BillDate >= previousStart && b.BillDate <= previousEnd)
+                .ToListAsync();
+            PreviousPeriodRevenue = previousBills.Sum(b => b.AmountPaid ?? 0);
+            
+            // Get previous period payments
+            var previousPayments = await _context.Payments
+                .Where(p => p.PaymentDate >= previousStart && p.PaymentDate <= previousEnd)
+                .ToListAsync();
+            PreviousPeriodPayments = previousPayments.Sum(p => p.Amount ?? 0);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calculating previous period data: {ex.Message}");
+            PreviousPeriodRevenue = 0;
+            PreviousPeriodPayments = 0;
+        }
+    }
+    
+    // Data classes for analytics
+    private class DailyRevenueData
+    {
+        public DateTime Date { get; set; }
+        public decimal Revenue { get; set; }
+    }
+    
+    private class PaymentMethodData
+    {
+        public string Method { get; set; } = "";
+        public int Count { get; set; }
+        public decimal Total { get; set; }
     }
 }

@@ -121,6 +121,7 @@ namespace HestiaLink.Services
                 "inventory" => "/inventory/stock-management",
                 "hr" => "/hr/employee-management",
                 "finance" => "/finance/payment-processing",
+                "employee" => "/employee/portal",
                 _ => "/dashboard"
             };
         }

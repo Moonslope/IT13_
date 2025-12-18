@@ -24,6 +24,8 @@
                 <select class="filter-select" @bind="FilterStatus">
                     <option value="All">All Orders</option>
                     <option value="PENDING">Pending</option>
+                    <option value="ORDERED">Ordered</option>
+                    <option value="FOR DELIVERY">For Delivery</option>
                     <option value="RECEIVED">Received</option>
                     <option value="CANCELLED">Cancelled</option>
                 </select>
@@ -87,6 +89,14 @@
                                             {
                                                 <span class="badge-pending">Pending</span>
                                             }
+                                            else if (purchase.PurchaseStatus == "ORDERED")
+                                            {
+                                                <span style="color: #f59e0b; font-weight: 600;">Ordered</span>
+                                            }
+                                            else if (purchase.PurchaseStatus == "FOR DELIVERY")
+                                            {
+                                                <span style="color: #3b82f6; font-weight: 600;">For Delivery</span>
+                                            }
                                             else
                                             {
                                                 <span class="badge-archived">@purchase.PurchaseStatus</span>
@@ -99,11 +109,17 @@
                                                     <button class="btn-icon-action edit" @onclick="() => OpenEditModal(purchase)" title="Edit">
                                                         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                                                     </button>
-                                                    <button class="btn-icon-action edit" style="background:#10b981;" @onclick="() => ReceivePurchase(purchase)" title="Mark as Received">
+                                                    <button class="btn-icon-action edit" style="background:#10b981;" @onclick="() => UpdatePurchaseStatus(purchase)" title="Mark as Ordered">
                                                         <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
                                                     </button>
                                                     <button class="btn-icon-action archive" @onclick="() => CancelPurchase(purchase)" title="Cancel">
                                                         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                                                    </button>
+                                                }
+                                                else if (purchase.PurchaseStatus == "ORDERED" || purchase.PurchaseStatus == "FOR DELIVERY")
+                                                {
+                                                    <button class="btn-icon-action edit" style="background:#10b981;" @onclick="() => UpdatePurchaseStatus(purchase)" title="@(purchase.PurchaseStatus == "ORDERED" ? "Mark as For Delivery" : "Mark as Received")">
+                                                        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
                                                     </button>
                                                 }
                                             </div>
@@ -465,11 +481,24 @@
         }
     }
 
-    private void ReceivePurchase(InventoryPurchase purchase)
+    private void UpdatePurchaseStatus(InventoryPurchase purchase)
     {
         PurchaseToProcess = purchase;
         CurrentActionType = ConfirmActionType.Receive;
-        ConfirmMessage = $"Mark purchase order {purchase.PurchaseNumber} as received? This will update inventory stock.";
+        
+        string nextStatus = purchase.PurchaseStatus switch
+        {
+            "PENDING" => "Ordered",
+            "ORDERED" => "For Delivery",
+            "FOR DELIVERY" => "Received",
+            _ => purchase.PurchaseStatus
+        };
+        
+        string message = nextStatus == "Received" 
+            ? $"Mark purchase order {purchase.PurchaseNumber} as received? This will update inventory stock."
+            : $"Mark purchase order {purchase.PurchaseNumber} as {nextStatus}?";
+            
+        ConfirmMessage = message;
         ShowConfirmModal = true;
     }
 
@@ -487,7 +516,7 @@
         {
             if (CurrentActionType == ConfirmActionType.Receive)
             {
-                await InventoryService.ReceivePurchaseAsync(PurchaseToProcess.PurchaseID);
+                await InventoryService.UpdatePurchaseStatusAsync(PurchaseToProcess.PurchaseID);
             }
             else if (CurrentActionType == ConfirmActionType.Cancel)
             {

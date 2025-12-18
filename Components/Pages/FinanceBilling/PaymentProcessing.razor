@@ -91,10 +91,10 @@
                             <th style="text-align:right;">Total Bill</th>
                             <th style="text-align:right;">Amount Paid</th>
                             <th style="text-align:right;">Balance</th>
-                            <th>Payment Method</th>
+                            <th style="text-align: center;">Payment Method</th>
                             <th>Reference No.</th>
                             <th>Payment Date</th>
-                            <th>Status</th>
+                            <th style="text-align: center;">Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -109,15 +109,15 @@
                                 <td style="text-align:right;">&#8369;@payment.TotalBill.ToString("N2")</td>
                                 <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@payment.AmountPaid.ToString("N2")</td>
                                 <td style="font-weight: 700; color: @(payment.Balance > 0 ? "#991b1b" : "#065f46"); text-align:right;">&#8369;@payment.Balance.ToString("N2")</td>
-                                <td>
-                                    <span class="status-badge" style="color: var(--color-dark-teal);">
-                                        @payment.PaymentMethod
+                                <td style="text-align: center;">
+                                    <span class="status-badge" style="color: var(--color-dark-teal); text-transform: capitalize;">
+                                        @payment.PaymentMethod.ToLower()
                                     </span>
                                 </td>
                                 <td style="font-family: monospace; font-size: 0.85rem;">@payment.ReferenceNumber</td>
                                 <td>@payment.PaymentDate.ToString("MMM dd, yyyy h:mm tt")</td>
-                                <td>
-                                    <span class="status-badge status-@payment.Status.ToLower()">@payment.Status</span>
+                                <td style="text-align: center;">
+                                    <span class="status-badge status-@payment.Status.ToLower()" style="text-transform: capitalize;">@payment.Status.ToLower()</span>
                                 </td>
                                 <td>
                                     <div style="display: flex; gap: 8px; justify-content: center;">
@@ -328,7 +328,7 @@
 <style>
     .status-paid { color: #065f46; }
     .status-partial { color: #92400e; }
-    .status-pending { color: #991b1b; }
+    .status-pending { color: #d97706; }
     .status-refunded { color: var(--color-dark-teal); }
     
     /* Pagination Styles */

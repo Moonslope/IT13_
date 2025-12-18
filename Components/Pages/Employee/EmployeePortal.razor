@@ -1,0 +1,1021 @@
+@page "/employee/portal"
+@using HestiaLink.Data
+@using HestiaLink.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject HestiaLink.Services.EmployeeDTRService DTRService
+@inject HestiaLink.Services.UserSession UserSession
+@inject IJSRuntime JSRuntime
+@layout HestiaIT13Final.Components.Layout.MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Employee Portal</h1>
+            <span class="page-topbar-subtitle">Digital Time Record</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <section class="page-content">
+        @if (!IsLoaded)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading your information...</p>
+            </div>
+        }
+        else if (CurrentEmployee == null)
+        {
+            <div class="error-message">
+                <h4>⚠️ Error</h4>
+                <p>Employee record not found. Please contact HR.</p>
+            </div>
+        }
+        else
+        {
+            <!-- Status Cards -->
+            <div class="dtr-cards-grid">
+                <div class="dtr-card">
+                    <div class="dtr-card-icon" style="background: #dbeafe;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="color: #1e40af;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                    </div>
+                    <div class="dtr-card-content">
+                        <div class="dtr-card-label">Current Shift</div>
+                        <div class="dtr-card-value">@GetCurrentShiftStatus()</div>
+                    </div>
+                </div>
+
+                <div class="dtr-card">
+                    <div class="dtr-card-icon" style="background: #d1fae5;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="color: #065f46;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    </div>
+                    <div class="dtr-card-content">
+                        <div class="dtr-card-label">Today's Hours</div>
+                        <div class="dtr-card-value">@GetTodayHours()</div>
+                    </div>
+                </div>
+
+                <div class="dtr-card">
+                    <div class="dtr-card-icon" style="background: #fef3c7;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="color: #92400e;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                    </div>
+                    <div class="dtr-card-content">
+                        <div class="dtr-card-label">This Month</div>
+                        <div class="dtr-card-value">@GetMonthlyHours()</div>
+                    </div>
+                </div>
+
+                <div class="dtr-card">
+                    <div class="dtr-card-icon" style="background: #fee2e2;">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="color: #991b1b;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    </div>
+                    <div class="dtr-card-content">
+                        <div class="dtr-card-label">Status</div>
+                        <div class="dtr-card-value">@GetAttendanceStatus()</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Check In/Out Section -->
+            <div class="dtr-action-section">
+                <div class="dtr-action-card">
+                    <div class="dtr-action-header">
+                        <h3>Time Record</h3>
+                        <div class="dtr-current-time">@DateTime.Now.ToString("hh:mm:ss tt")</div>
+                    </div>
+
+                    @if (TodayAttendance == null || TodayAttendance.ClockInTime == null)
+                    {
+                        <!-- Check In Button -->
+                        <button class="dtr-btn-checkin" @onclick="HandleCheckIn" disabled="@IsProcessing">
+                            @if (IsProcessing)
+                            {
+                                <span class="spinner-small"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                                <span>Check In</span>
+                            }
+                        </button>
+                        <p class="dtr-action-note">Click to record your arrival time</p>
+                    }
+                    else if (TodayAttendance.ClockOutTime == null)
+                    {
+                        <!-- Check Out Button -->
+                        <div class="dtr-checkin-info">
+                            <div class="dtr-info-row">
+                                <span class="dtr-info-label">Checked In:</span>
+                                <span class="dtr-info-value">@TodayAttendance.ClockInTime?.ToString("hh:mm tt")</span>
+                            </div>
+                            <div class="dtr-info-row">
+                                <span class="dtr-info-label">Hours Worked:</span>
+                                <span class="dtr-info-value">@GetWorkedHours()</span>
+                            </div>
+                        </div>
+                        <button class="dtr-btn-checkout" @onclick="HandleCheckOut" disabled="@IsProcessing">
+                            @if (IsProcessing)
+                            {
+                                <span class="spinner-small"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                                <span>Check Out</span>
+                            }
+                        </button>
+                        <p class="dtr-action-note">Click to record your departure time</p>
+                    }
+                    else
+                    {
+                        <!-- Already Checked Out -->
+                        <div class="dtr-complete-info">
+                            <div class="dtr-info-row">
+                                <span class="dtr-info-label">Checked In:</span>
+                                <span class="dtr-info-value">@TodayAttendance.ClockInTime?.ToString("hh:mm tt")</span>
+                            </div>
+                            <div class="dtr-info-row">
+                                <span class="dtr-info-label">Checked Out:</span>
+                                <span class="dtr-info-value">@TodayAttendance.ClockOutTime?.ToString("hh:mm tt")</span>
+                            </div>
+                            <div class="dtr-info-row highlight">
+                                <span class="dtr-info-label">Total Hours:</span>
+                                <span class="dtr-info-value">@(TodayAttendance.TotalHours?.ToString("F2") ?? "0.00") hours</span>
+                            </div>
+                        </div>
+                        <div class="dtr-complete-badge">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                            <span>Completed for Today</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Recent Attendance History -->
+            <div class="dtr-history-section">
+                <h3>Recent Attendance</h3>
+                <div class="dtr-history-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Check In</th>
+                                <th>Check Out</th>
+                                <th>Hours</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (RecentAttendance.Any())
+                            {
+                                @foreach (var record in RecentAttendance.Take(10))
+                                {
+                                    <tr>
+                                        <td>@record.AttendanceDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@(record.ClockInTime?.ToString("hh:mm tt") ?? "-")</td>
+                                        <td>@(record.ClockOutTime?.ToString("hh:mm tt") ?? "-")</td>
+                                        <td>@(record.TotalHours?.ToString("F2") ?? "0.00")</td>
+                                        <td>
+                                            <span class="status-badge @GetStatusClass(record.Status)">
+                                                @record.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" style="text-align:center; color:#64748b; padding:20px;">
+                                        No attendance records found
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </section>
+</div>
+
+<!-- Check In Confirmation Modal -->
+@if (ShowCheckInModal)
+{
+    <div class="modal-overlay" @onclick="CloseCheckInModal">
+        <div class="modal-content modal-confirm" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Confirm Check-in</h3>
+                <button class="modal-close" @onclick="CloseCheckInModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-message">
+                    <div class="confirm-icon success">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <p><strong>Are you sure you want to check in now?</strong></p>
+                    <div class="confirm-details" style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #64748b; font-weight: 600;">Time:</span>
+                            <span style="font-weight: 700;">@DateTime.Now.ToString("hh:mm:ss tt")</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #64748b; font-weight: 600;">Date:</span>
+                            <span style="font-weight: 700;">@DateTime.Now.ToString("MMMM dd, yyyy")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseCheckInModal" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-primary btn-confirm-checkin" @onclick="ConfirmCheckIn" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <span>Confirm Check-in</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Check Out Confirmation Modal -->
+@if (ShowCheckOutModal)
+{
+    <div class="modal-overlay" @onclick="CloseCheckOutModal">
+        <div class="modal-content modal-confirm" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Confirm Check-out</h3>
+                <button class="modal-close" @onclick="CloseCheckOutModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-message">
+                    <div class="confirm-icon warning">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                    </div>
+                    <p><strong>Are you sure you want to check out now?</strong></p>
+                    <div class="confirm-details" style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #64748b; font-weight: 600;">Check-in Time:</span>
+                            <span style="font-weight: 700;">@TodayAttendance?.ClockInTime?.ToString("hh:mm:ss tt")</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #64748b; font-weight: 600;">Check-out Time:</span>
+                            <span style="font-weight: 700;">@DateTime.Now.ToString("hh:mm:ss tt")</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                            <span style="color: #64748b; font-weight: 600;">Hours Worked:</span>
+                            <span style="font-weight: 700; color: #059669;">@((DateTime.Now - TodayAttendance?.ClockInTime)?.TotalHours.ToString("F2") ?? "0.00") hrs</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseCheckOutModal" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-primary btn-confirm-checkout" @onclick="ConfirmCheckOut" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <span>Confirm Check-out</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .loading-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #0f766e;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+
+    .spinner-small {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .dtr-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+
+    .dtr-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        border: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.2s ease;
+    }
+
+    .dtr-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
+    }
+
+    .dtr-card-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .dtr-card-icon svg {
+        width: 28px;
+        height: 28px;
+    }
+
+    .dtr-card-content {
+        flex: 1;
+    }
+
+    .dtr-card-label {
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .dtr-card-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .dtr-action-section {
+        margin-bottom: 32px;
+    }
+
+    .dtr-action-card {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e5e7eb;
+        text-align: center;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .dtr-action-header {
+        margin-bottom: 24px;
+    }
+
+    .dtr-action-header h3 {
+        margin: 0 0 8px 0;
+        font-size: 1.5rem;
+        color: #1e293b;
+        font-weight: 700;
+    }
+
+    .dtr-current-time {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0f766e;
+        font-family: 'Courier New', monospace;
+    }
+
+    .dtr-btn-checkin,
+    .dtr-btn-checkout {
+        width: 100%;
+        padding: 18px 24px;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        transition: all 0.2s ease;
+        margin-bottom: 12px;
+    }
+
+    .dtr-btn-checkin {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+
+    .dtr-btn-checkin:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16,185,129,0.4);
+    }
+
+    .dtr-btn-checkout {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+    }
+
+    .dtr-btn-checkout:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(239,68,68,0.4);
+    }
+
+    .dtr-btn-checkin:disabled,
+    .dtr-btn-checkout:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .dtr-btn-checkin svg,
+    .dtr-btn-checkout svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    .dtr-action-note {
+        color: #64748b;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .dtr-checkin-info,
+    .dtr-complete-info {
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: left;
+    }
+
+    .dtr-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .dtr-info-row:last-child {
+        border-bottom: none;
+    }
+
+    .dtr-info-row.highlight {
+        background: #e0f2fe;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 8px;
+        border: none;
+    }
+
+    .dtr-info-label {
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.95rem;
+    }
+
+    .dtr-info-value {
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 1rem;
+    }
+
+    .dtr-complete-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #d1fae5;
+        color: #065f46;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        margin-top: 16px;
+    }
+
+    .dtr-complete-badge svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .dtr-history-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        border: 1px solid #e5e7eb;
+    }
+
+    .dtr-history-section h3 {
+        margin: 0 0 20px 0;
+        font-size: 1.2rem;
+        color: #1e293b;
+        font-weight: 700;
+    }
+
+    .dtr-history-table {
+        overflow-x: auto;
+    }
+
+    .dtr-history-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .dtr-history-table thead {
+        background: #f8fafc;
+    }
+
+    .dtr-history-table th {
+        padding: 12px;
+        text-align: left;
+        font-weight: 700;
+        color: #374151;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .dtr-history-table td {
+        padding: 14px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+    }
+
+    .dtr-history-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .status-badge.status-present {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.status-absent {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .status-badge.status-late {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .error-message {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 8px;
+        padding: 20px;
+        color: #991b1b;
+        text-align: center;
+    }
+
+    .error-message h4 {
+        margin: 0 0 8px 0;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-confirm {
+        max-width: 450px;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        color: #1e293b;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 28px;
+        color: #64748b;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+    .modal-close:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .confirm-message {
+        text-align: center;
+        padding: 10px 0;
+    }
+
+    .confirm-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .confirm-icon.success {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .confirm-icon.warning {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .confirm-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .confirm-details {
+        text-align: left;
+    }
+
+    .btn-confirm-checkin {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .btn-confirm-checkout {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #e2e8f0;
+    }
+
+    .btn-secondary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #0f766e;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #0d9488;
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
+
+@code {
+    private Employee? CurrentEmployee;
+    private EmployeeAttendance? TodayAttendance;
+    private List<EmployeeAttendance> RecentAttendance = new();
+    private bool IsLoaded = false;
+    private bool IsProcessing = false;
+    private bool ShowCheckInModal = false;
+    private bool ShowCheckOutModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserSession.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/loginpage");
+            return;
+        }
+
+        await LoadData();
+        
+        // Update time display every second
+        _ = Task.Run(async () =>
+        {
+            while (true)
+            {
+                await Task.Delay(1000);
+                if (IsLoaded)
+                {
+                    StateHasChanged();
+                }
+            }
+        });
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            IsLoaded = false;
+            StateHasChanged();
+
+            using var context = ContextFactory.CreateDbContext();
+
+            // Get employee from user's EmployeeID
+            if (UserSession.UserID > 0)
+            {
+                var user = await context.SystemUsers
+                    .FirstOrDefaultAsync(u => u.UserID == UserSession.UserID);
+
+                if (user?.EmployeeID != null)
+                {
+                    CurrentEmployee = await context.Employees
+                        .Include(e => e.Position)
+                        .FirstOrDefaultAsync(e => e.EmployeeId == user.EmployeeID);
+                }
+            }
+
+            if (CurrentEmployee == null)
+            {
+                IsLoaded = true;
+                return;
+            }
+
+            // Get today's attendance
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            TodayAttendance = await DTRService.GetTodayAttendanceAsync(CurrentEmployee.EmployeeId);
+
+            // Get recent attendance (last 30 days)
+            var startDate = today.AddDays(-30);
+            RecentAttendance = await DTRService.GetMonthlyAttendanceAsync(
+                CurrentEmployee.EmployeeId, 
+                today.Year, 
+                today.Month);
+
+            IsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error loading data: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private void HandleCheckIn()
+    {
+        if (CurrentEmployee == null || IsProcessing) return;
+        ShowCheckInModal = true;
+        StateHasChanged();
+    }
+
+    private void HandleCheckOut()
+    {
+        if (CurrentEmployee == null || IsProcessing) return;
+        ShowCheckOutModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseCheckInModal()
+    {
+        ShowCheckInModal = false;
+    }
+
+    private void CloseCheckOutModal()
+    {
+        ShowCheckOutModal = false;
+    }
+
+    private async Task ConfirmCheckIn()
+    {
+        if (CurrentEmployee == null || IsProcessing) return;
+
+        try
+        {
+            IsProcessing = true;
+            ShowCheckInModal = false;
+            StateHasChanged();
+
+            var result = await DTRService.ClockInAsync(
+                CurrentEmployee.EmployeeId, 
+                UserSession.UserID);
+
+            if (result.Success)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Check-in successful!");
+                await LoadData();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ConfirmCheckOut()
+    {
+        if (CurrentEmployee == null || IsProcessing) return;
+
+        try
+        {
+            IsProcessing = true;
+            ShowCheckOutModal = false;
+            StateHasChanged();
+
+            var result = await DTRService.ClockOutAsync(
+                CurrentEmployee.EmployeeId, 
+                UserSession.UserID);
+
+            if (result.Success)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", 
+                    $"Check-out successful! Total hours: {result.Attendance?.TotalHours?.ToString("F2") ?? "0.00"}");
+                await LoadData();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", result.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCurrentShiftStatus()
+    {
+        if (TodayAttendance == null || TodayAttendance.ClockInTime == null)
+            return "Not Started";
+        
+        if (TodayAttendance.ClockOutTime == null)
+            return "In Progress";
+        
+        return "Completed";
+    }
+
+    private string GetTodayHours()
+    {
+        if (TodayAttendance?.TotalHours != null)
+            return $"{TodayAttendance.TotalHours:F2} hrs";
+        
+        if (TodayAttendance?.ClockInTime != null && TodayAttendance.ClockOutTime == null)
+        {
+            var worked = DateTime.Now - TodayAttendance.ClockInTime.Value;
+            return $"{worked.TotalHours:F2} hrs";
+        }
+        
+        return "0.00 hrs";
+    }
+
+    private string GetMonthlyHours()
+    {
+        var total = RecentAttendance.Sum(a => a.TotalHours ?? 0);
+        return $"{total:F2} hrs";
+    }
+
+    private string GetAttendanceStatus()
+    {
+        if (TodayAttendance == null)
+            return "Not Checked In";
+        
+        if (TodayAttendance.ClockOutTime == null)
+            return "Checked In";
+        
+        return "Checked Out";
+    }
+
+    private string GetWorkedHours()
+    {
+        if (TodayAttendance?.ClockInTime == null)
+            return "0.00 hrs";
+        
+        if (TodayAttendance.ClockOutTime != null)
+            return $"{TodayAttendance.TotalHours?.ToString("F2") ?? "0.00"} hrs";
+        
+        var worked = DateTime.Now - TodayAttendance.ClockInTime.Value;
+        return $"{worked.TotalHours:F2} hrs";
+    }
+
+    private string GetStatusClass(string? status)
+    {
+        return status?.ToLower() switch
+        {
+            "present" => "status-present",
+            "absent" => "status-absent",
+            "late" => "status-late",
+            _ => "status-present"
+        };
+    }
+
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+}
+
