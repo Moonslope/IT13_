@@ -156,7 +156,7 @@ body {
 /* --- LOGIN PAGE STYLES --- */
 
 .login-layout-root {
-  background-color: var(--color-dark-teal);
+  background: linear-gradient(135deg, #001f22 0%, #003d44 30%, #00535b 60%, #00454d 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1661,7 +1661,7 @@ body {
 
 .badge-active {
   background-color: transparent;
-  color: var(--color-gray-700);
+  color: #10b981;
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -1675,6 +1675,15 @@ body {
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.badge-archived {
+  background-color: transparent;
+  color: #6b7280;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .user-detail-view {

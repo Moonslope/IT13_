@@ -120,6 +120,7 @@ namespace HestiaLink.Services
                 "housekeeping" => "/housekeeping/dashboard",
                 "inventory" => "/inventory/stock-management",
                 "hr" => "/hr/employee-management",
+                "finance" => "/finance/payment-processing",
                 _ => "/dashboard"
             };
         }
