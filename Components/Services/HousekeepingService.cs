@@ -1170,6 +1170,111 @@ namespace HestiaLink.Services
 
         #endregion
 
+        #region Maintenance Operations
+
+        /// <summary>
+        /// Gets all active maintenance requests
+        /// </summary>
+        public async Task<List<MaintenanceRequest>> GetActiveMaintenanceRequestsAsync()
+        {
+            using var context = await _factory.CreateDbContextAsync();
+            try
+            {
+                return await context.MaintenanceRequests
+                    .AsNoTracking()
+                    .Include(m => m.Room)
+                    .Include(m => m.ReportedByUser)
+                    .Where(m => m.Status == "Pending" || m.Status == "In Progress")
+                    .OrderByDescending(m => m.ReportedDate)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting maintenance requests: {ex.Message}");
+                return new List<MaintenanceRequest>();
+            }
+        }
+
+        /// <summary>
+        /// Reports a maintenance issue from a cleaning task
+        /// </summary>
+        public async Task<(bool Success, string Message)> ReportMaintenanceIssueAsync(int taskId, int userId, string description)
+        {
+            using var context = await _factory.CreateDbContextAsync();
+            try
+            {
+                // 1. Get Task details first
+                var task = await context.CleaningTasks.FindAsync(taskId);
+                if (task == null) return (false, "Task not found");
+                int roomId = task.RoomID;
+
+                // 2. Complete the task
+                var (success, message) = await CompleteTaskAsync(taskId, userId, "Maintenance Required");
+                if (!success) return (false, message);
+
+                // 3. Create Maintenance Request
+                var request = new MaintenanceRequest
+                {
+                    RoomID = roomId,
+                    ReportedByUserID = userId,
+                    Description = description,
+                    Status = "Pending",
+                    ReportedDate = DateTime.Now
+                };
+
+                context.MaintenanceRequests.Add(request);
+                await context.SaveChangesAsync();
+
+                return (true, "Issue reported successfully. Room is moved to maintenance.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reporting issue: {ex.Message}");
+                return (false, $"Error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Resolves a maintenance issue
+        /// </summary>
+        public async Task<(bool Success, string Message)> ResolveMaintenanceIssueAsync(int roomId, string resolutionNotes)
+        {
+            using var context = await _factory.CreateDbContextAsync();
+            try
+            {
+                // 1. Find the pending request for this room
+                var request = await context.MaintenanceRequests
+                    .Where(m => m.RoomID == roomId && (m.Status == "Pending" || m.Status == "In Progress"))
+                    .OrderByDescending(m => m.ReportedDate)
+                    .FirstOrDefaultAsync();
+
+                if (request != null)
+                {
+                    request.Status = "Resolved";
+                    request.ResolvedDate = DateTime.Now;
+                    request.ResolutionNotes = resolutionNotes;
+                }
+
+                // 2. Update Room Status to Available
+                var roomSuccess = await UpdateRoomStatusAsync(roomId, "Available");
+
+                if (roomSuccess)
+                {
+                    await context.SaveChangesAsync();
+                    return (true, "Maintenance issue resolved.");
+                }
+
+                return (false, "Failed to update room status.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error resolving issue: {ex.Message}");
+                return (false, $"Error: {ex.Message}");
+            }
+        }
+
+        #endregion
+
         #region Helper Classes
 
         public class TaskStatistics
