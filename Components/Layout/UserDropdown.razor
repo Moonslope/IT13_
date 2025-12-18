@@ -1,6 +1,5 @@
 @namespace HestiaIT13Final.Components.Layout
 @inject HestiaLink.Services.UserSession UserSession
-@inject NavigationManager Navigation
 
 <div class="user-dropdown-container">
     <button class="user-icon-btn" @onclick="ToggleDropdown" @onclick:stopPropagation="true">
@@ -15,11 +14,6 @@
                 <div class="user-dropdown-name">@UserSession.Username</div>
                 <div class="user-dropdown-role">@UserSession.Role</div>
             </div>
-            <div class="user-dropdown-divider"></div>
-            <button class="user-dropdown-item" @onclick="HandleLogout">
-                <span>🚪</span>
-                <span>Logout</span>
-            </button>
         </div>
     }
 </div>
@@ -37,12 +31,6 @@
         ShowDropdown = false;
     }
 
-    private void HandleLogout()
-    {
-        ShowDropdown = false;
-        UserSession.Logout();
-        Navigation.NavigateTo("/loginpage", forceLoad: true);
-    }
 }
 
 <style>

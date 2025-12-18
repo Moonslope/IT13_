@@ -491,6 +491,23 @@
         CategoryToDelete = null;
     }
 
+    private async Task ConfirmDeleteAction()
+    {
+        if (CategoryToDelete != null)
+        {
+            // If category is active, archive it; otherwise unarchive it
+            if ((CategoryToDelete.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase))
+            {
+                await ArchiveCategory(CategoryToDelete);
+            }
+            else
+            {
+                await UnarchiveCategory(CategoryToDelete);
+            }
+        }
+        CloseConfirmModal();
+    }
+
     private void ShowAlert(string message)
     {
         AlertMessage = message;
