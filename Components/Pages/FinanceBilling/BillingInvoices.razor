@@ -82,8 +82,8 @@
                             <th style="text-align:right;">Subtotal</th>
                             <th style="text-align:right;">VAT (12%)</th>
                             <th style="text-align:right;">Service Charge (10%)</th>
-                            <th style="text-align:right;">Total Amount</th>
-                            <th>Status</th>
+                            <th style="text-align: right;">Total Amount</th>
+                            <th style="text-align: center;">Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -100,8 +100,8 @@
                                 <td style="text-align:right;">&#8369;@invoice.VAT.ToString("N2")</td>
                                 <td style="text-align:right;">&#8369;@invoice.ServiceCharge.ToString("N2")</td>
                                 <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@invoice.TotalAmount.ToString("N2")</td>
-                                <td>
-                                    <span class="status-badge status-@invoice.Status.ToLower()">@invoice.Status</span>
+                                <td style="text-align: center;">
+                                    <span class="status-badge status-@invoice.Status.ToLower()" style="text-transform: capitalize;">@invoice.Status.ToLower()</span>
                                 </td>
                                 <td>
                                     <div style="display: flex; gap: 8px; justify-content: center;">
@@ -263,12 +263,14 @@
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 700;
-        text-transform: uppercase;
+        font-weight: 700;
+        text-transform: capitalize;
+        display: inline-block;
         display: inline-block;
     }
 
     .status-pending {
-        color: #92400e;
+        color: #d97706; /* Amber-600 */
     }
 
     .status-paid {
