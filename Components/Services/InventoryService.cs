@@ -10,10 +10,12 @@ namespace HestiaLink.Services
     public class InventoryService
     {
         private readonly HestiaLinkContext _context;
+        private readonly DualWriteService? _dualWrite;
 
-        public InventoryService(HestiaLinkContext context)
+        public InventoryService(HestiaLinkContext context, DualWriteService? dualWrite = null)
         {
             _context = context;
+            _dualWrite = dualWrite;
         }
 
         #region Inventory Item Operations
@@ -66,9 +68,21 @@ namespace HestiaLink.Services
             item.CreatedDate = DateTime.Now;
             item.IsActive = true;
 
-            _context.InventoryItems.Add(item);
-            await _context.SaveChangesAsync();
-            return item;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.InventoryItems.Add(item);
+                    await context.SaveChangesAsync();
+                    return item;
+                }, "InventoryItem", item);
+            }
+            else
+            {
+                _context.InventoryItems.Add(item);
+                await _context.SaveChangesAsync();
+                return item;
+            }
         }
 
         /// <summary>
@@ -76,22 +90,47 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<bool> UpdateItemAsync(InventoryItem item)
         {
-            var existing = await _context.InventoryItems.FirstOrDefaultAsync(i => i.ItemId == item.ItemId);
-            if (existing == null) return false;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    var existing = await context.InventoryItems.FirstOrDefaultAsync(i => i.ItemId == item.ItemId);
+                    if (existing == null) return false;
 
-            existing.ItemCode = item.ItemCode;
-            existing.ItemName = item.ItemName;
-            existing.Category = item.Category;
-            existing.UnitOfMeasure = item.UnitOfMeasure;
-            existing.UnitCost = item.UnitCost;
-            existing.CurrentStock = item.CurrentStock;
-            existing.ReorderPoint = item.ReorderPoint;
-            existing.SupplierID = item.SupplierID;
-            existing.ServiceCategoryId = item.ServiceCategoryId;
-            existing.IsServiceItem = item.IsServiceItem;
+                    existing.ItemCode = item.ItemCode;
+                    existing.ItemName = item.ItemName;
+                    existing.Category = item.Category;
+                    existing.UnitOfMeasure = item.UnitOfMeasure;
+                    existing.UnitCost = item.UnitCost;
+                    existing.CurrentStock = item.CurrentStock;
+                    existing.ReorderPoint = item.ReorderPoint;
+                    existing.SupplierID = item.SupplierID;
+                    existing.ServiceCategoryId = item.ServiceCategoryId;
+                    existing.IsServiceItem = item.IsServiceItem;
 
-            await _context.SaveChangesAsync();
-            return true;
+                    await context.SaveChangesAsync();
+                    return true;
+                }, "InventoryItem", item);
+            }
+            else
+            {
+                var existing = await _context.InventoryItems.FirstOrDefaultAsync(i => i.ItemId == item.ItemId);
+                if (existing == null) return false;
+
+                existing.ItemCode = item.ItemCode;
+                existing.ItemName = item.ItemName;
+                existing.Category = item.Category;
+                existing.UnitOfMeasure = item.UnitOfMeasure;
+                existing.UnitCost = item.UnitCost;
+                existing.CurrentStock = item.CurrentStock;
+                existing.ReorderPoint = item.ReorderPoint;
+                existing.SupplierID = item.SupplierID;
+                existing.ServiceCategoryId = item.ServiceCategoryId;
+                existing.IsServiceItem = item.IsServiceItem;
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
         }
 
         /// <summary>
@@ -171,9 +210,21 @@ namespace HestiaLink.Services
             supplier.CreatedDate = DateTime.Now;
             supplier.IsActive = true;
 
-            _context.Suppliers.Add(supplier);
-            await _context.SaveChangesAsync();
-            return supplier;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.Suppliers.Add(supplier);
+                    await context.SaveChangesAsync();
+                    return supplier;
+                }, "Supplier", supplier);
+            }
+            else
+            {
+                _context.Suppliers.Add(supplier);
+                await _context.SaveChangesAsync();
+                return supplier;
+            }
         }
 
         /// <summary>
@@ -181,20 +232,43 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<bool> UpdateSupplierAsync(Supplier supplier)
         {
-            var existing = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplier.SupplierID);
-            if (existing == null) return false;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    var existing = await context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplier.SupplierID);
+                    if (existing == null) return false;
 
-            existing.SupplierCode = supplier.SupplierCode;
-            existing.SupplierName = supplier.SupplierName;
-            existing.ContactPerson = supplier.ContactPerson;
-            existing.ContactPhone = supplier.ContactPhone;
-            existing.ContactEmail = supplier.ContactEmail;
-            existing.Address = supplier.Address;
-            existing.SupplierType = supplier.SupplierType;
-            existing.UpdatedDate = DateTime.Now;
+                    existing.SupplierCode = supplier.SupplierCode;
+                    existing.SupplierName = supplier.SupplierName;
+                    existing.ContactPerson = supplier.ContactPerson;
+                    existing.ContactPhone = supplier.ContactPhone;
+                    existing.ContactEmail = supplier.ContactEmail;
+                    existing.Address = supplier.Address;
+                    existing.SupplierType = supplier.SupplierType;
+                    existing.UpdatedDate = DateTime.Now;
 
-            await _context.SaveChangesAsync();
-            return true;
+                    await context.SaveChangesAsync();
+                    return true;
+                }, "Supplier", supplier);
+            }
+            else
+            {
+                var existing = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplier.SupplierID);
+                if (existing == null) return false;
+
+                existing.SupplierCode = supplier.SupplierCode;
+                existing.SupplierName = supplier.SupplierName;
+                existing.ContactPerson = supplier.ContactPerson;
+                existing.ContactPhone = supplier.ContactPhone;
+                existing.ContactEmail = supplier.ContactEmail;
+                existing.Address = supplier.Address;
+                existing.SupplierType = supplier.SupplierType;
+                existing.UpdatedDate = DateTime.Now;
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
         }
 
         /// <summary>
@@ -202,13 +276,29 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<bool> DeactivateSupplierAsync(int supplierId)
         {
-            var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
-            if (supplier == null) return false;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    var supplier = await context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
+                    if (supplier == null) return false;
 
-            supplier.IsActive = false;
-            supplier.UpdatedDate = DateTime.Now;
-            await _context.SaveChangesAsync();
-            return true;
+                    supplier.IsActive = false;
+                    supplier.UpdatedDate = DateTime.Now;
+                    await context.SaveChangesAsync();
+                    return true;
+                }, "Supplier", null);
+            }
+            else
+            {
+                var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
+                if (supplier == null) return false;
+
+                supplier.IsActive = false;
+                supplier.UpdatedDate = DateTime.Now;
+                await _context.SaveChangesAsync();
+                return true;
+            }
         }
 
         /// <summary>
@@ -216,13 +306,29 @@ namespace HestiaLink.Services
         /// </summary>
         public async Task<bool> ReactivateSupplierAsync(int supplierId)
         {
-            var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
-            if (supplier == null) return false;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    var supplier = await context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
+                    if (supplier == null) return false;
 
-            supplier.IsActive = true;
-            supplier.UpdatedDate = DateTime.Now;
-            await _context.SaveChangesAsync();
-            return true;
+                    supplier.IsActive = true;
+                    supplier.UpdatedDate = DateTime.Now;
+                    await context.SaveChangesAsync();
+                    return true;
+                }, "Supplier", null);
+            }
+            else
+            {
+                var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.SupplierID == supplierId);
+                if (supplier == null) return false;
+
+                supplier.IsActive = true;
+                supplier.UpdatedDate = DateTime.Now;
+                await _context.SaveChangesAsync();
+                return true;
+            }
         }
 
         /// <summary>
@@ -320,9 +426,21 @@ namespace HestiaLink.Services
             purchase.PurchaseStatus = "PENDING";
             purchase.CalculateTotal();
 
-            _context.InventoryPurchases.Add(purchase);
-            await _context.SaveChangesAsync();
-            return purchase;
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.InventoryPurchases.Add(purchase);
+                    await context.SaveChangesAsync();
+                    return purchase;
+                }, "InventoryPurchase", purchase);
+            }
+            else
+            {
+                _context.InventoryPurchases.Add(purchase);
+                await _context.SaveChangesAsync();
+                return purchase;
+            }
         }
 
         /// <summary>
@@ -348,27 +466,57 @@ namespace HestiaLink.Services
         {
             try
             {
-                var existing = await _context.InventoryPurchases
-                    .FirstOrDefaultAsync(p => p.PurchaseID == purchase.PurchaseID);
-                
-                if (existing == null) return false;
-
-                // Only allow editing if status is PENDING
-                if (existing.PurchaseStatus != "PENDING")
+                if (_dualWrite != null)
                 {
-                    throw new InvalidOperationException("Only pending purchase orders can be edited.");
+                    return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                    {
+                        var existing = await context.InventoryPurchases
+                            .FirstOrDefaultAsync(p => p.PurchaseID == purchase.PurchaseID);
+                        
+                        if (existing == null) return false;
+
+                        // Only allow editing if status is PENDING
+                        if (existing.PurchaseStatus != "PENDING")
+                        {
+                            throw new InvalidOperationException("Only pending purchase orders can be edited.");
+                        }
+
+                        existing.ItemID = purchase.ItemID;
+                        existing.SupplierID = purchase.SupplierID;
+                        existing.Quantity = purchase.Quantity;
+                        existing.UnitPrice = purchase.UnitPrice;
+                        existing.TotalAmount = purchase.Quantity * purchase.UnitPrice;
+                        existing.Notes = purchase.Notes;
+                        existing.PurchaseDate = purchase.PurchaseDate;
+
+                        await context.SaveChangesAsync();
+                        return true;
+                    }, "InventoryPurchase", purchase);
                 }
+                else
+                {
+                    var existing = await _context.InventoryPurchases
+                        .FirstOrDefaultAsync(p => p.PurchaseID == purchase.PurchaseID);
+                    
+                    if (existing == null) return false;
 
-                existing.ItemID = purchase.ItemID;
-                existing.SupplierID = purchase.SupplierID;
-                existing.Quantity = purchase.Quantity;
-                existing.UnitPrice = purchase.UnitPrice;
-                existing.TotalAmount = purchase.Quantity * purchase.UnitPrice;
-                existing.Notes = purchase.Notes;
-                existing.PurchaseDate = purchase.PurchaseDate;
+                    // Only allow editing if status is PENDING
+                    if (existing.PurchaseStatus != "PENDING")
+                    {
+                        throw new InvalidOperationException("Only pending purchase orders can be edited.");
+                    }
 
-                await _context.SaveChangesAsync();
-                return true;
+                    existing.ItemID = purchase.ItemID;
+                    existing.SupplierID = purchase.SupplierID;
+                    existing.Quantity = purchase.Quantity;
+                    existing.UnitPrice = purchase.UnitPrice;
+                    existing.TotalAmount = purchase.Quantity * purchase.UnitPrice;
+                    existing.Notes = purchase.Notes;
+                    existing.PurchaseDate = purchase.PurchaseDate;
+
+                    await _context.SaveChangesAsync();
+                    return true;
+                }
             }
             catch (Exception ex)
             {

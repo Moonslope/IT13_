@@ -2,6 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.EntityFrameworkCore.Infrastructure
 @inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject HestiaLink.Services.DualWriteService DualWriteService
 @inject IJSRuntime JSRuntime
 @layout HestiaIT13Final.Components.Layout.MainLayout
 
@@ -87,9 +88,18 @@
                                                 <button class="btn-icon-action edit" @onclick="() => OpenEditModal(category)" title="Edit">
                                                     <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                                                 </button>
-                                                <button class="btn-icon-action archive" @onclick="() => DeleteCategory(category)" title="Delete">
-                                                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                                                </button>
+                                                @if ((category.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <button class="btn-icon-action archive" @onclick="() => ArchiveCategory(category)" title="Archive">
+                                                        <svg viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44l.8-.97zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55z"/></svg>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn-icon-action edit" @onclick="() => UnarchiveCategory(category)" title="Unarchive">
+                                                        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+                                                    </button>
+                                                }
                                             </div>
                                         </td>
                                     </tr>
@@ -356,31 +366,32 @@
                 return;
             }
 
-            using var context = ContextFactory.CreateDbContext();
-
             if (IsEditMode)
             {
-                var existing = await context.ServiceCategories
-                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == CurrentCategory.ServiceCategoryId);
-                
-                if (existing == null)
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
                 {
-                    ShowAlert("Category not found.");
-                    return;
-                }
+                    var existing = await context.ServiceCategories
+                        .FirstOrDefaultAsync(c => c.ServiceCategoryId == CurrentCategory.ServiceCategoryId);
+                    
+                    if (existing == null)
+                    {
+                        throw new Exception("Category not found.");
+                    }
 
-                existing.ServiceCategoryName = CurrentCategory.ServiceCategoryName;
-                existing.Description = CurrentCategory.Description;
-                existing.Status = CurrentCategory.Status;
-                existing.Function = CurrentCategory.Function;
-                existing.UpdatedAt = DateTime.UtcNow;
+                    existing.ServiceCategoryName = CurrentCategory.ServiceCategoryName;
+                    existing.Description = CurrentCategory.Description;
+                    existing.Status = CurrentCategory.Status;
+                    existing.Function = CurrentCategory.Function;
+                    existing.UpdatedAt = DateTime.UtcNow;
 
-                await context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
+                }, "ServiceCategory", CurrentCategory);
             }
             else
             {
                 // Check if category name already exists (case-insensitive)
-                var exists = await context.ServiceCategories
+                using var checkContext = ContextFactory.CreateDbContext();
+                var exists = await checkContext.ServiceCategories
                     .AnyAsync(c => c.ServiceCategoryName.ToLower() == CurrentCategory.ServiceCategoryName.ToLower());
                 
                 if (exists)
@@ -393,8 +404,11 @@
                 CurrentCategory.UpdatedAt = DateTime.UtcNow;
                 CurrentCategory.Status ??= "Active";
 
-                context.ServiceCategories.Add(CurrentCategory);
-                await context.SaveChangesAsync();
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.ServiceCategories.Add(CurrentCategory);
+                    await context.SaveChangesAsync();
+                }, "ServiceCategory", CurrentCategory);
             }
 
             CloseModal();
@@ -407,77 +421,67 @@
         }
     }
 
-    private async Task DeleteCategory(ServiceCategory category)
+    private async Task ArchiveCategory(ServiceCategory category)
     {
         try
         {
-            using var context = ContextFactory.CreateDbContext();
-            
-            // Check if category has services
-            var hasServices = await context.Services
-                .AnyAsync(s => s.ServiceCategoryId == category.ServiceCategoryId);
-            
-            CategoryToDelete = category; 
-            
-            if (hasServices)
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+                $"Are you sure you want to archive category '{category.ServiceCategoryName}'? This will mark it as inactive."))
             {
-                ConfirmMessage = $"Category '{category.ServiceCategoryName}' has associated services. Are you sure you want to delete it? This will remove the category from all associated services.";
+                return;
             }
-            else
-            {
-                 ConfirmMessage = $"Are you sure you want to delete category '{category.ServiceCategoryName}'?";
-            }
-            ShowConfirmModal = true;
-        }
-        catch (Exception ex)
-        {
-             ShowAlert($"Error checking category: {ex.Message}");
-        }
-    }
 
-    private async Task ConfirmDeleteAction()
-    {
-        if (CategoryToDelete == null) return;
-        
-        try
-        {
-            using var context = ContextFactory.CreateDbContext();
-            
-            var hasServices = await context.Services
-                .AnyAsync(s => s.ServiceCategoryId == CategoryToDelete.ServiceCategoryId);
-                
-            if (hasServices)
+            await DualWriteService.ExecuteDualWriteAsync(async (context) =>
             {
-                var services = await context.Services
-                    .Where(s => s.ServiceCategoryId == CategoryToDelete.ServiceCategoryId)
-                    .ToListAsync();
+                var existing = await context.ServiceCategories
+                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == category.ServiceCategoryId);
                 
-                foreach (var service in services)
+                if (existing != null)
                 {
-                    service.ServiceCategoryId = null;
+                    existing.Status = "Inactive";
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    await context.SaveChangesAsync();
                 }
-            }
-            
-             var existing = await context.ServiceCategories
-                .FirstOrDefaultAsync(c => c.ServiceCategoryId == CategoryToDelete.ServiceCategoryId);
-            
-            if (existing != null)
-            {
-                context.ServiceCategories.Remove(existing);
-                await context.SaveChangesAsync();
-            }
+            }, "ServiceCategory", category);
 
             await LoadData();
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            ShowAlert($"Error deleting category: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", $"Error archiving category: {ex.Message}");
         }
-        finally
+    }
+
+    private async Task UnarchiveCategory(ServiceCategory category)
+    {
+        try
         {
-            ShowConfirmModal = false;
-            CategoryToDelete = null;
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+                $"Are you sure you want to unarchive category '{category.ServiceCategoryName}'? This will mark it as active."))
+            {
+                return;
+            }
+
+            await DualWriteService.ExecuteDualWriteAsync(async (context) =>
+            {
+                var existing = await context.ServiceCategories
+                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == category.ServiceCategoryId);
+                
+                if (existing != null)
+                {
+                    existing.Status = "Active";
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    await context.SaveChangesAsync();
+                }
+            }, "ServiceCategory", category);
+
+            await LoadData();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error unarchiving category: {ex.Message}");
         }
     }
 

@@ -126,21 +126,6 @@
 
             <!-- Quick Stats Row -->
             <div class="quick-stats-row">
-                <div class="quick-stat border-green">
-                    <div class="quick-stat-value">@PresentEmployees</div>
-                    <div class="quick-stat-label">Present</div>
-                    <div class="quick-stat-desc">employees today</div>
-                </div>
-                <div class="quick-stat border-amber">
-                    <div class="quick-stat-value">@LateEmployees</div>
-                    <div class="quick-stat-label">Late</div>
-                    <div class="quick-stat-desc">marked late</div>
-                </div>
-                <div class="quick-stat border-red">
-                    <div class="quick-stat-value">@AbsentEmployees</div>
-                    <div class="quick-stat-label">Absent</div>
-                    <div class="quick-stat-desc">not present</div>
-                </div>
                 <div class="quick-stat border-blue">
                     <div class="quick-stat-value">@RoomsForCleaning</div>
                     <div class="quick-stat-label">Needs Cleaning</div>
@@ -419,9 +404,6 @@
 
     // Employee data
     private int TotalEmployees = 0;
-    private int PresentEmployees = 0;
-    private int LateEmployees = 0;
-    private int AbsentEmployees = 0;
 
     // Cleaning schedule data
     private int RoomsForCleaning = 0;
@@ -547,20 +529,6 @@
 
             var scheduleIds = todaySchedules.Select(s => s.ScheduleId).ToList();
 
-            // Get today's attendances
-            var todayAttendances = await context.Attendances
-                .Include(a => a.Schedule)
-                .Where(a => a.AttendanceDate == todayDate && scheduleIds.Contains(a.ScheduleId))
-                .ToListAsync();
-
-            PresentEmployees = todayAttendances.Count(a => a.AttendanceStatus == "Present");
-            AbsentEmployees = todayAttendances.Count(a => a.AttendanceStatus == "Absent");
-            
-            // Calculate late count (check-in time > scheduled start + 15 minutes)
-            LateEmployees = todayAttendances.Count(a =>
-                a.ActualCheckIn.HasValue &&
-                a.Schedule != null &&
-                a.ActualCheckIn.Value.TimeOfDay > a.Schedule.ScheduledStart.ToTimeSpan().Add(TimeSpan.FromMinutes(15)));
         }
         catch (Exception ex)
         {
@@ -855,6 +823,59 @@
 }
 
 <style>
+    /* Quick Stats Row */
+    .quick-stats-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 36px;
+    }
+
+    .quick-stat {
+        background: white;
+        border-radius: 12px;
+        padding: 20px 24px;
+        border-left: 4px solid #e5e7eb;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .quick-stat:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .quick-stat.border-blue {
+        border-left-color: #3b82f6;
+    }
+
+    .quick-stat.border-purple {
+        border-left-color: #a855f7;
+    }
+
+    .quick-stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+
+    .quick-stat-label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    .quick-stat-desc {
+        font-size: 0.8rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+
     /* Summary Cards - Compact */
     .summary-cards {
         display: grid;
@@ -1470,6 +1491,9 @@
     }
 
     @@media (max-width: 768px) {
+        .quick-stats-row {
+            grid-template-columns: 1fr;
+        }
         .charts-grid {
             grid-template-columns: 1fr;
         }

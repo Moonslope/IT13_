@@ -2,6 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.EntityFrameworkCore.Infrastructure
 @inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject HestiaLink.Services.DualWriteService DualWriteService
 @inject IJSRuntime JSRuntime
 @layout HestiaIT13Final.Components.Layout.MainLayout
 
@@ -556,33 +557,38 @@
 
         try
         {
-            using var context = ContextFactory.CreateDbContext();
             if (IsEditMode)
             {
-                var existingDept = await context.Departments.FindAsync(CurrentDept.DepartmentId);
-                if (existingDept != null)
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
                 {
-                    existingDept.DepartmentName = CurrentDept.DepartmentName;
-                    existingDept.Description = CurrentDept.Description;
-                    existingDept.Status = CurrentDept.Status;
-                    context.Departments.Update(existingDept);
-                    await context.SaveChangesAsync();
-
-                    // Update local list
-                    var localDept = Departments.FirstOrDefault(d => d.DepartmentId == CurrentDept.DepartmentId);
-                    if (localDept != null)
+                    var existingDept = await context.Departments.FindAsync(CurrentDept.DepartmentId);
+                    if (existingDept != null)
                     {
-                        localDept.DepartmentName = CurrentDept.DepartmentName;
-                        localDept.Description = CurrentDept.Description;
-                        localDept.Status = CurrentDept.Status;
+                        existingDept.DepartmentName = CurrentDept.DepartmentName;
+                        existingDept.Description = CurrentDept.Description;
+                        existingDept.Status = CurrentDept.Status;
+                        context.Departments.Update(existingDept);
+                        await context.SaveChangesAsync();
+
+                        // Update local list
+                        var localDept = Departments.FirstOrDefault(d => d.DepartmentId == CurrentDept.DepartmentId);
+                        if (localDept != null)
+                        {
+                            localDept.DepartmentName = CurrentDept.DepartmentName;
+                            localDept.Description = CurrentDept.Description;
+                            localDept.Status = CurrentDept.Status;
+                        }
+                        StateHasChanged();
                     }
-                    StateHasChanged();
-                }
+                }, "Department", CurrentDept);
             }
             else
             {
-                context.Departments.Add(CurrentDept);
-                await context.SaveChangesAsync();
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.Departments.Add(CurrentDept);
+                    await context.SaveChangesAsync();
+                }, "Department", CurrentDept);
 
                 // Reload to get the new department with ID
                 await LoadDepartments();

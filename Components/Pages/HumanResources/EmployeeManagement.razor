@@ -2,6 +2,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.EntityFrameworkCore.Infrastructure
 @inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject HestiaLink.Services.DualWriteService DualWriteService
 @inject IJSRuntime JSRuntime
 @layout HestiaIT13Final.Components.Layout.MainLayout
 
@@ -423,31 +424,36 @@
     {
         try
         {
-            using var context = ContextFactory.CreateDbContext();
             if (IsEditMode)
             {
-                var existing = await context.Employees.FindAsync(CurrentEmp.EmployeeId);
-                if (existing != null)
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
                 {
-                    existing.FirstName = CurrentEmp.FirstName;
-                    existing.MiddleName = CurrentEmp.MiddleName;
-                    existing.LastName = CurrentEmp.LastName;
-                    existing.Email = CurrentEmp.Email;
-                    existing.ContactNumber = CurrentEmp.ContactNumber;
-                    existing.Address = CurrentEmp.Address;
-                    existing.DateOfBirth = CurrentEmp.DateOfBirth;
-                    existing.PositionId = CurrentEmp.PositionId;
-                    existing.HireDate = CurrentEmp.HireDate;
-                    existing.Status = CurrentEmp.Status;
+                    var existing = await context.Employees.FindAsync(CurrentEmp.EmployeeId);
+                    if (existing != null)
+                    {
+                        existing.FirstName = CurrentEmp.FirstName;
+                        existing.MiddleName = CurrentEmp.MiddleName;
+                        existing.LastName = CurrentEmp.LastName;
+                        existing.Email = CurrentEmp.Email;
+                        existing.ContactNumber = CurrentEmp.ContactNumber;
+                        existing.Address = CurrentEmp.Address;
+                        existing.DateOfBirth = CurrentEmp.DateOfBirth;
+                        existing.PositionId = CurrentEmp.PositionId;
+                        existing.HireDate = CurrentEmp.HireDate;
+                        existing.Status = CurrentEmp.Status;
 
-                    context.Employees.Update(existing);
-                    await context.SaveChangesAsync();
-                }
+                        context.Employees.Update(existing);
+                        await context.SaveChangesAsync();
+                    }
+                }, "Employee", CurrentEmp);
             }
             else
             {
-                context.Employees.Add(CurrentEmp);
-                await context.SaveChangesAsync();
+                await DualWriteService.ExecuteDualWriteAsync(async (context) =>
+                {
+                    context.Employees.Add(CurrentEmp);
+                    await context.SaveChangesAsync();
+                }, "Employee", CurrentEmp);
             }
 
             // Reload data to get fresh navigation properties
@@ -480,19 +486,21 @@
     {
         try
         {
-            using var context = ContextFactory.CreateDbContext();
-            var emp = await context.Employees.FindAsync(ArchiveTarget.EmployeeId);
-            if (emp != null)
+            await DualWriteService.ExecuteDualWriteAsync(async (context) =>
             {
-                emp.Status = "Archived";
-                context.Employees.Update(emp);
-                await context.SaveChangesAsync();
+                var emp = await context.Employees.FindAsync(ArchiveTarget.EmployeeId);
+                if (emp != null)
+                {
+                    emp.Status = "Archived";
+                    context.Employees.Update(emp);
+                    await context.SaveChangesAsync();
+                }
+            }, "Employee", ArchiveTarget);
 
-                var local = Employees.FirstOrDefault(e => e.EmployeeId == emp.EmployeeId);
-                if (local != null) local.Status = "Archived";
-                StateHasChanged();
-                await JSRuntime.InvokeVoidAsync("alert", "Employee archived");
-            }
+            var local = Employees.FirstOrDefault(e => e.EmployeeId == ArchiveTarget.EmployeeId);
+            if (local != null) local.Status = "Archived";
+            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("alert", "Employee archived");
         }
         catch (Exception ex)
         {
