@@ -3,7 +3,7 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@inject IDbContextFactory<HestiaLinkContext> DbFactory
 @inject NavigationManager Navigation
 @inject UserSession UserSession
 @inject IJSRuntime JSRuntime
@@ -51,7 +51,22 @@
                     </div>
                     <div class="hero-stat-value">@AvailableRooms</div>
                     <div class="hero-stat-label">Available Rooms</div>
-                    <div class="hero-stat-change">of @TotalRooms total</div>
+                    <div class="hero-stat-change">
+                        @if (AvailableRooms > YesterdayAvailableRooms)
+                        {
+                            <span style="color: #6ee7b7;">↑ @(AvailableRooms - YesterdayAvailableRooms)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (AvailableRooms < YesterdayAvailableRooms)
+                        {
+                            <span style="color: #fca5a5;">↓ @(YesterdayAvailableRooms - AvailableRooms)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>No change vs yesterday</span>
+                        }
+                    </div>
                 </div>
                 <div class="hero-stat">
                     <div class="hero-stat-icon">
@@ -59,7 +74,22 @@
                     </div>
                     <div class="hero-stat-value">@ActiveGuests</div>
                     <div class="hero-stat-label">Active Guests</div>
-                    <div class="hero-stat-change">checked in now</div>
+                    <div class="hero-stat-change">
+                         @if (ActiveGuests > YesterdayActiveGuests)
+                        {
+                            <span style="color: #6ee7b7;">↑ @(ActiveGuests - YesterdayActiveGuests)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (ActiveGuests < YesterdayActiveGuests)
+                        {
+                            <span style="color: #fca5a5;">↓ @(YesterdayActiveGuests - ActiveGuests)</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>Same as yesterday</span>
+                        }
+                    </div>
                 </div>
                 <div class="hero-stat">
                     <div class="hero-stat-icon">
@@ -75,7 +105,22 @@
                     </div>
                     <div class="hero-stat-value">@OccupancyRate%</div>
                     <div class="hero-stat-label">Occupancy Rate</div>
-                    <div class="hero-stat-change">rooms occupied</div>
+                     <div class="hero-stat-change">
+                        @if (OccupancyRate > YesterdayOccupancyRate)
+                        {
+                            <span style="color: #6ee7b7;">↑ @((OccupancyRate - YesterdayOccupancyRate).ToString("0.0"))%</span>
+                            <span>vs yesterday</span>
+                        }
+                        else if (OccupancyRate < YesterdayOccupancyRate)
+                        {
+                            <span style="color: #fca5a5;">↓ @((YesterdayOccupancyRate - OccupancyRate).ToString("0.0"))%</span>
+                            <span>vs yesterday</span>
+                        }
+                        else
+                        {
+                            <span>Same as yesterday</span>
+                        }
+                    </div>
                 </div>
             </div>
 
@@ -217,6 +262,32 @@
                         }
                     </div>
                 </div>
+
+                <!-- Inventory Chart -->
+                <div class="premium-card dashboard-grid-full">
+                    <div class="premium-card-header">
+                        <h3 class="premium-card-title">
+                            <span class="card-icon">
+                                <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zM12 5.5v9l6-4.5z"/></svg>
+                            </span>
+                            Inventory Overview
+                        </h3>
+                    </div>
+                    <div class="premium-card-body">
+                         @if (InventoryByCategory.Any())
+                        {
+                            <div class="chart-container" style="height: 300px;">
+                                <canvas id="inventoryChart"></canvas>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="empty-state-premium">
+                                <div class="empty-state-title">No Inventory Data</div>
+                            </div>
+                        }
+                    </div>
+                </div>
             </div>
 
             <!-- Attendance Details Modal -->
@@ -326,6 +397,11 @@
     private decimal TodayPayments = 0m;
     private double OccupancyRate = 0d;
 
+    // Comparisons
+    private int YesterdayAvailableRooms = 0;
+    private int YesterdayActiveGuests = 0;
+    private double YesterdayOccupancyRate = 0d;
+
     // Employee data
     private int TotalEmployees = 0;
 
@@ -368,37 +444,60 @@
 
             UpdateRangeDates();
 
-            TotalRooms = await DbContext.Rooms.CountAsync();
-            AvailableRooms = await DbContext.Rooms.CountAsync(r => r.Status == "Available");
+            using var context = await DbFactory.CreateDbContextAsync();
+
+            TotalRooms = await context.Rooms.CountAsync();
+            AvailableRooms = await context.Rooms.CountAsync(r => r.Status == "Available");
 
             var snapshotDate = DateOnly.FromDateTime(RangeEnd);
-            ActiveGuests = await DbContext.Reservations.CountAsync(r => r.CheckInDate <= snapshotDate && (r.CheckOutDate >= snapshotDate));
+            ActiveGuests = await context.Reservations.CountAsync(r => r.CheckInDate <= snapshotDate && (r.CheckOutDate >= snapshotDate));
 
-            PendingHousekeepingTasks = await DbContext.CleaningTasks.CountAsync(t => t.Status == "Pending");
+            PendingHousekeepingTasks = await context.CleaningTasks.CountAsync(t => t.Status == "Pending");
 
-            TotalOutstanding = await DbContext.Bills.Where(b => b.BalanceDue != null).SumAsync(b => (decimal?)b.BalanceDue) ?? 0m;
+            TotalOutstanding = await context.Bills.Where(b => b.BalanceDue != null).SumAsync(b => (decimal?)b.BalanceDue) ?? 0m;
 
             var rangeStartDateOnly = DateOnly.FromDateTime(RangeStart);
             var rangeEndDateOnly = DateOnly.FromDateTime(RangeEnd);
 
-            TodayCheckouts = await DbContext.Reservations.CountAsync(r => r.CheckOutDate >= rangeStartDateOnly && r.CheckOutDate <= rangeEndDateOnly);
+            TodayCheckouts = await context.Reservations.CountAsync(r => r.CheckOutDate >= rangeStartDateOnly && r.CheckOutDate <= rangeEndDateOnly);
 
             var rangeStartDateTime = RangeStart.Date;
             var rangeEndDateTime = RangeEnd.Date.AddDays(1);
-            TodayPayments = await DbContext.Payments
+            TodayPayments = await context.Payments
                 .Where(p => p.PaymentDate >= rangeStartDateTime && p.PaymentDate < rangeEndDateTime)
                 .SumAsync(p => (decimal?)p.Amount) ?? 0m;
 
             OccupancyRate = TotalRooms == 0 ? 0 : Math.Round((double)(TotalRooms - AvailableRooms) / TotalRooms * 100, 1);
 
+            // Fetch Comparisons (Assuming "Yesterday" for simplicity when "Today" is selected)
+            // If Range is Year/Month, comparisons could be Last Year/Month, but let's stick to previous day relative to snapshot for now
+            // or if Range is "Today", compare to "Yesterday".
+            
+            DateOnly comparisonDate;
+            if (SelectedRange == "Today")
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1));
+            else if (SelectedRange == "Week")
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-7)); // Compare to last week
+            else 
+                comparisonDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1)); // Compare to last month
+
+            // Comparison Metrics
+            var yesterdaySnapshotDate = comparisonDate;
+            // Note: This is an approximation. Strict historical room availability isn't stored.
+            // We use Reservation data to infer historical occupancy.
+            var comparisonOccupied = await context.Reservations.CountAsync(r => r.CheckInDate <= yesterdaySnapshotDate && r.CheckOutDate > yesterdaySnapshotDate);
+            YesterdayAvailableRooms = TotalRooms - comparisonOccupied; // Rough estimate assuming total rooms constant
+            YesterdayActiveGuests = comparisonOccupied; // Rough estimate
+            YesterdayOccupancyRate = TotalRooms == 0 ? 0 : Math.Round((double)comparisonOccupied / TotalRooms * 100, 1);
+
             // Load employee data
-            await LoadEmployeeData();
+            await LoadEmployeeData(context);
 
             // Load cleaning schedule data
             await LoadCleaningData();
 
             // Load chart data
-            await LoadChartData();
+            await LoadChartData(context);
 
             IsLoaded = true;
             StateHasChanged();
@@ -414,17 +513,17 @@
         }
     }
 
-    private async Task LoadEmployeeData()
+    private async Task LoadEmployeeData(HestiaLinkContext context)
     {
         try
         {
             var todayDate = DateOnly.FromDateTime(RangeEnd);
             
             // Total active employees
-            TotalEmployees = await DbContext.Employees.CountAsync(e => e.Status == "Active");
+            TotalEmployees = await context.Employees.CountAsync(e => e.Status == "Active");
 
             // Get today's schedules
-            var todaySchedules = await DbContext.Schedules
+            var todaySchedules = await context.Schedules
                 .Where(s => s.ScheduleDate == todayDate && s.IsActive == true)
                 .ToListAsync();
 
@@ -463,7 +562,7 @@
         }
     }
 
-    private async Task LoadChartData()
+    private async Task LoadChartData(HestiaLinkContext context)
     {
         try
         {
@@ -472,7 +571,7 @@
             var rangeEndDate = DateOnly.FromDateTime(RangeEnd);
 
             // Pull all check-ins in a single range query to reuse for chart and details
-            var checkInRange = await DbContext.Reservations
+            var checkInRange = await context.Reservations
                 .Include(r => r.Guest)
                 .Include(r => r.ReservedRooms)
                     .ThenInclude(rr => rr.Room)
@@ -509,7 +608,7 @@
 
             // 2. Inventory by Category
             InventoryByCategory.Clear();
-            var inventoryItems = await DbContext.InventoryItems
+            var inventoryItems = await context.InventoryItems
                 .Where(i => i.IsActive == true)
                 .ToListAsync();
             
@@ -538,7 +637,7 @@
             var rangeStartDateOnly = DateOnly.FromDateTime(RangeStart);
             var rangeEndDateOnly = DateOnly.FromDateTime(RangeEnd);
             
-            var rangeAttendances = await DbContext.Attendances
+            var rangeAttendances = await context.Attendances
                 .Include(a => a.Schedule)
                     .ThenInclude(s => s.Employee)
                 .Where(a => a.AttendanceDate >= rangeStartDateOnly && a.AttendanceDate <= rangeEndDateOnly)
@@ -550,7 +649,7 @@
                 Absent = rangeAttendances.Count(a => a.AttendanceStatus == "Absent"),
                 OnLeave = rangeAttendances.Count(a => a.AttendanceStatus == "OnLeave"),
                 Late = rangeAttendances.Count(a => a.AttendanceStatus == "Late" || (a.ActualCheckIn.HasValue && a.Schedule != null && a.ActualCheckIn.Value.TimeOfDay > a.Schedule.ScheduledStart.ToTimeSpan().Add(TimeSpan.FromMinutes(15)))),
-                TotalEmployees = await DbContext.Employees.CountAsync(e => e.Status == "Active")
+                TotalEmployees = await context.Employees.CountAsync(e => e.Status == "Active")
             };
 
             // Build attendance detail list (latest first)

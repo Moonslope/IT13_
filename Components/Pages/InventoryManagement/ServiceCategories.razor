@@ -53,13 +53,13 @@
                         <table class="user-table">
                             <thead>
                                 <tr>
-                                    <th>Category Name</th>
-                                    <th>Description</th>
-                                    <th>Function</th>
-                                    <th>Status</th>
-                                    <th>Services Count</th>
-                                    <th>Created At</th>
-                                    <th>Updated At</th>
+                                    <th style="text-align:center;">Category Name</th>
+                                    <th style="text-align:center;">Description</th>
+                                    <th style="text-align:center;">Function</th>
+                                    <th style="text-align:center;">Status</th>
+                                    <th style="text-align:center;">Services Count</th>
+                                    <th style="text-align:center;">Created At</th>
+                                    <th style="text-align:center;">Updated At</th>
                                     <th style="text-align:center;">Actions</th>
                                 </tr>
                             </thead>
@@ -67,10 +67,10 @@
                                 @foreach (var category in PaginatedCategories)
                                 {
                                     <tr>
-                                        <td style="font-weight:600;">@category.ServiceCategoryName</td>
-                                        <td>@(category.Description ?? "-")</td>
-                                        <td>@(category.Function ?? "-")</td>
-                                        <td>
+                                        <td style="font-weight:600; text-align:center;">@category.ServiceCategoryName</td>
+                                        <td style="text-align:center;">@(category.Description ?? "-")</td>
+                                        <td style="text-align:center;">@(category.Function ?? "-")</td>
+                                        <td style="text-align:center;">
                                             @if ((category.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase))
                                             {
                                                 <span class="badge-active">@(category.Status ?? "Active")</span>
@@ -80,9 +80,9 @@
                                                 <span class="badge-archived">@category.Status</span>
                                             }
                                         </td>
-                                        <td>@(category.Services?.Count ?? 0)</td>
-                                        <td>@(category.CreatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
-                                        <td>@(category.UpdatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">@(category.Services?.Count ?? 0)</td>
+                                        <td style="text-align:center;">@(category.CreatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">@(category.UpdatedAt?.ToString("yyyy-MM-dd") ?? "-")</td>
                                         <td style="text-align:center;">
                                             <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
                                                 <button class="btn-icon-action edit" @onclick="() => OpenEditModal(category)" title="Edit">
@@ -175,6 +175,41 @@
     </div>
 }
 
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmDeleteAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText = "";
     private string FilterStatus = "All";
@@ -183,6 +218,15 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private ServiceCategory? CategoryToDelete;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     // Pagination
     private int CurrentPage = 1;
@@ -217,7 +261,7 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
-            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            ShowAlert($"Database Error: {ex.Message}");
             IsLoaded = true;
         }
     }
@@ -318,7 +362,7 @@
         {
             if (string.IsNullOrWhiteSpace(CurrentCategory.ServiceCategoryName))
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Please fill in the category name.");
+                ShowAlert("Please fill in the category name.");
                 return;
             }
 
@@ -352,7 +396,7 @@
                 
                 if (exists)
                 {
-                    await JSRuntime.InvokeVoidAsync("alert", "A category with this name already exists.");
+                    ShowAlert("A category with this name already exists.");
                     return;
                 }
 
@@ -373,7 +417,7 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error saving category: {ex.Message}");
+            ShowAlert($"Error saving category: {ex.Message}");
         }
     }
 
@@ -439,6 +483,23 @@
         {
             await JSRuntime.InvokeVoidAsync("alert", $"Error unarchiving category: {ex.Message}");
         }
+    }
+
+    private void CloseConfirmModal()
+    {
+        ShowConfirmModal = false;
+        CategoryToDelete = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
     }
 }
 

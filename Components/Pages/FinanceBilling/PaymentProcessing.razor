@@ -88,9 +88,9 @@
                             <th>Invoice ID</th>
                             <th>Guest Name</th>
                             <th>Room</th>
-                            <th>Total Bill</th>
-                            <th>Amount Paid</th>
-                            <th>Balance</th>
+                            <th style="text-align:right;">Total Bill</th>
+                            <th style="text-align:right;">Amount Paid</th>
+                            <th style="text-align:right;">Balance</th>
                             <th>Payment Method</th>
                             <th>Reference No.</th>
                             <th>Payment Date</th>
@@ -106,11 +106,11 @@
                                 <td style="font-weight: 700;">@payment.GuestName</td>
                                 <td>@payment.RoomNumber</td>
 
-                                <td>&#8369;@payment.TotalBill.ToString("N2")</td>
-                                <td style="font-weight: 900; color: var(--color-dark-teal);">&#8369;@payment.AmountPaid.ToString("N2")</td>
-                                <td style="font-weight: 700; color: @(payment.Balance > 0 ? "#991b1b" : "#065f46");">&#8369;@payment.Balance.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@payment.TotalBill.ToString("N2")</td>
+                                <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@payment.AmountPaid.ToString("N2")</td>
+                                <td style="font-weight: 700; color: @(payment.Balance > 0 ? "#991b1b" : "#065f46"); text-align:right;">&#8369;@payment.Balance.ToString("N2")</td>
                                 <td>
-                                    <span class="status-badge" style="background: var(--color-light-gray); color: var(--color-dark-teal);">
+                                    <span class="status-badge" style="color: var(--color-dark-teal);">
                                         @payment.PaymentMethod
                                     </span>
                                 </td>

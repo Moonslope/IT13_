@@ -5,7 +5,7 @@
 @using HestiaLink.Models
 @using HestiaLink.Services
 @using Microsoft.EntityFrameworkCore
-@inject HestiaLinkContext DbContext
+@inject IDbContextFactory<HestiaLinkContext> DbFactory
 @inject IJSRuntime JSRuntime
 @inject UserSession UserSession
 @inject InventoryService InventoryService
@@ -29,7 +29,7 @@
                 <div class="hero-stat-icon">
                     <svg viewBox="0 0 24 24"><path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/></svg>
                 </div>
-                <div class="hero-stat-value">@Rooms.Count(r => r.Status == "Occupied")</div>
+                <div class="hero-stat-value">@Rooms.Where(r => r.Status == "Occupied").ToList().Count</div>
                 <div class="hero-stat-label">Occupied</div>
                 <div class="hero-stat-change">Out of @Rooms.Count occupied</div>
             </div>
@@ -37,15 +37,15 @@
                 <div class="hero-stat-icon">
                     <svg viewBox="0 0 24 24"><path d="M19.36 2.72L20.78 4.14L15.06 9.85C16.13 11.39 16.28 13.24 15.38 14.44L9.06 8.12C10.26 7.22 12.11 7.37 13.65 8.44L19.36 2.72M5.93 17.57C3.92 15.56 2.69 13.16 2.35 10.92L7.23 8.83L14.67 16.27L12.58 21.15C10.34 20.81 7.94 19.58 5.93 17.57Z"/></svg>
                 </div>
-                <div class="hero-stat-value">@Rooms.Count(r => r.Status == "For Cleaning")</div>
-                <div class="hero-stat-label">For Cleaning</div>
+                <div class="hero-stat-value">@Rooms.Where(r => r.Status == "Cleaning").ToList().Count</div>
+                <div class="hero-stat-label">Cleaning</div>
                 <div class="hero-stat-change">Out of @Rooms.Count rooms</div>
             </div>
             <div class="hero-stat">
                 <div class="hero-stat-icon">
                     <svg viewBox="0 0 24 24"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
                 </div>
-                <div class="hero-stat-value">@Rooms.Count(r => r.Status == "Maintenance")</div>
+                <div class="hero-stat-value">@Rooms.Where(r => r.Status == "Maintenance").ToList().Count</div>
                 <div class="hero-stat-label">Under Maintenance</div>
                 <div class="hero-stat-change">Out of @Rooms.Count rooms</div>
             </div>
@@ -53,7 +53,7 @@
                 <div class="hero-stat-icon">
                     <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                 </div>
-                <div class="hero-stat-value">@Rooms.Count(r => r.Status == "Available")</div>
+                <div class="hero-stat-value">@Rooms.Where(r => r.Status == "Available").ToList().Count</div>
                 <div class="hero-stat-label">Available</div>
                 <div class="hero-stat-change">Ready for check-in</div>
             </div>
@@ -68,7 +68,7 @@
                     <option value="All">All</option>
                     <option value="Available">Available</option>
                     <option value="Occupied">Occupied</option>
-                    <option value="For Cleaning">For Cleaning</option>
+                    <option value="Cleaning">Cleaning</option>
                     <option value="Maintenance">Maintenance</option>
                 </select>
 
@@ -475,6 +475,7 @@
     private int ItemsPerPage = 12;
 
     private List<RoomCard> Rooms = new();
+    private List<HestiaLink.Models.RoomType> RoomTypes = new();
     private List<Service> AvailableServices = new();
     private HashSet<int> SelectedServiceIds = new();
     private HashSet<int> AddServiceSelection = new();
@@ -495,7 +496,9 @@
 
         try
         {
-            AvailableServices = await DbContext.Services
+            using var context = await DbFactory.CreateDbContextAsync();
+            AvailableServices = await context.Services
+                .AsNoTracking()
                 .Include(s => s.ServiceCategory)
                 .Where(s => s.Status == "Active" && s.IsActive == true)
                 .OrderBy(s => s.ServiceCategory != null ? s.ServiceCategory.ServiceCategoryName : "ZZZ")
@@ -517,8 +520,10 @@
     {
         try
         {
+            using var context = await DbFactory.CreateDbContextAsync();
             // Get all inventory items that are connected to service categories
-            var categoryInventory = await DbContext.InventoryItems
+            var categoryInventory = await context.InventoryItems
+                .AsNoTracking()
                 .Where(i => i.IsServiceItem == true && i.IsActive == true && i.ServiceCategoryId != null)
                 .ToListAsync();
             
@@ -567,15 +572,14 @@
 
         try
         {
-            // Clear any tracked entities to prevent conflicts
-            DbContext.ChangeTracker.Clear();
+            using var context = await DbFactory.CreateDbContextAsync();
 
-            await LoadFromRoomStatusDisplayView();
+            await LoadFromRoomStatusDisplayView(context);
 
             if (!Rooms.Any())
             {
                 await SafeJsInvoke("console.warn", "No data from view, falling back to direct table access");
-                await LoadFromTablesDirect();
+                await LoadFromTablesDirect(context);
             }
 
             StateHasChanged();
@@ -592,11 +596,11 @@
         }
     }
 
-    private async Task LoadFromRoomStatusDisplayView()
+    private async Task LoadFromRoomStatusDisplayView(HestiaLinkContext context)
     {
         try
         {
-            var conn = DbContext.Database.GetDbConnection();
+            var conn = context.Database.GetDbConnection();
             using var cmd = conn.CreateCommand();
 
             cmd.CommandText = @"
@@ -632,7 +636,7 @@
                 };
 
                 var typeName = reader["TypeName"]?.ToString()?.Trim();
-                roomCard.RoomCharge = await GetRoomPriceByTypeName(typeName, roomCard.RoomNumber);
+                roomCard.RoomCharge = await GetRoomPriceByTypeName(typeName, roomCard.RoomNumber, context);
 
                 if (roomCard.Status == "Occupied" && roomCard.CheckInDate.HasValue && roomCard.CheckOutDate.HasValue)
                 {
@@ -661,20 +665,20 @@
         }
     }
 
-    private async Task<decimal> GetRoomPriceByTypeName(string? typeName, string roomNumber)
+    private async Task<decimal> GetRoomPriceByTypeName(string? typeName, string roomNumber, HestiaLinkContext context)
     {
         try
         {
             if (!string.IsNullOrEmpty(typeName))
             {
-                var roomType = await DbContext.RoomTypes
+                var roomType = await context.RoomTypes
                     .FirstOrDefaultAsync(rt => rt.TypeName == typeName && rt.Status == "Active");
 
                 if (roomType != null)
                     return roomType.BasePrice;
             }
 
-            var room = await DbContext.Rooms
+            var room = await context.Rooms
                 .Include(r => r.RoomType)
                 .FirstOrDefaultAsync(r => r.RoomNumber == roomNumber && r.RoomType != null);
 
@@ -686,12 +690,12 @@
         }
     }
 
-    private async Task LoadFromTablesDirect()
+    private async Task LoadFromTablesDirect(HestiaLinkContext context)
     {
         try
         {
             // Use AsNoTracking to prevent entity tracking conflicts
-            var rooms = await DbContext.Rooms
+            var rooms = await context.Rooms
                 .AsNoTracking()
                 .Include(r => r.RoomType)
                 .Where(r => r.RoomType != null && r.RoomType.Status == "Active")
@@ -704,13 +708,13 @@
                 return;
             }
 
-            var activeReservations = await DbContext.Reservations
+            var activeReservations = await context.Reservations
                 .AsNoTracking()
                 .Where(r => r.Status == "Checked In")
                 .Include(r => r.Guest)
                 .ToListAsync();
 
-            var reservedRooms = await DbContext.ReservedRooms
+            var reservedRooms = await context.ReservedRooms
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -773,11 +777,11 @@
             "AVAILABLE" => "Available",
             "OCCUPIED" => "Occupied",
             "CHECKED IN" => "Occupied",
-            "CHECKED OUT" => "For Cleaning",
-            "DIRTY" => "For Cleaning",
-            "FOR CLEANING" => "For Cleaning",
+            "CHECKED OUT" => "Cleaning",
+            "DIRTY" => "Cleaning",
+            "FOR CLEANING" => "Cleaning",
             "MAINTENANCE" => "Maintenance",
-            "CLEANING" => "For Cleaning",
+            "CLEANING" => "Cleaning",
             _ => dbStatus
         };
     }
@@ -788,7 +792,7 @@
         {
             "Occupied" => "badge-occupied",
             "Available" => "badge-available",
-            "For Cleaning" => "badge-cleaning",
+            "Cleaning" => "badge-cleaning",
             "Maintenance" => "badge-maintenance",
             _ => "badge-available"
         };
@@ -1040,6 +1044,7 @@
     private string GuestLastName = "";
     private string GuestEmail = "";
     private string GuestContact = "";
+
     private DateTime? GuestDOB;
     private string GuestAddress = "";
     private DateOnly GuestCheckIn = DateOnly.FromDateTime(DateTime.Today);
@@ -1143,7 +1148,9 @@
             return;
         }
 
-        var roomEntity = await DbContext.Rooms
+        using var context = await DbFactory.CreateDbContextAsync();
+
+        var roomEntity = await context.Rooms
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.RoomNumber == SelectedRoom.RoomNumber);
 
@@ -1159,8 +1166,8 @@
             return;
         }
 
-        var overlap = await DbContext.ReservedRooms
-            .Join(DbContext.Reservations, rr => rr.ReservationId, res => res.ReservationId, (rr, res) => new { rr, res })
+        var overlap = await context.ReservedRooms
+            .Join(context.Reservations, rr => rr.ReservationId, res => res.ReservationId, (rr, res) => new { rr, res })
             .Where(x => x.rr.RoomId == roomEntity.RoomId &&
                        x.res.Status == "Checked In" &&
                        ((GuestCheckIn >= x.res.CheckInDate && GuestCheckIn < x.res.CheckOutDate) ||
@@ -1214,22 +1221,21 @@
     {
         try
         {
-            // Clear entity tracking to prevent conflicts
-            DbContext.ChangeTracker.Clear();
+            using var context = await DbFactory.CreateDbContextAsync();
 
             // Get the execution strategy for retry support
-            var executionStrategy = DbContext.Database.CreateExecutionStrategy();
+            var executionStrategy = context.Database.CreateExecutionStrategy();
 
             // Execute all operations within the retry strategy
             await executionStrategy.ExecuteAsync(async () =>
             {
                 // Create the transaction inside the execution strategy
-                using var transaction = await DbContext.Database.BeginTransactionAsync();
+                using var transaction = await context.Database.BeginTransactionAsync();
 
                 try
                 {
                     // Reload the room entity with tracking for update
-                    var roomForUpdate = await DbContext.Rooms
+                    var roomForUpdate = await context.Rooms
                         .FirstOrDefaultAsync(r => r.RoomId == roomEntity.RoomId);
 
                     if (roomForUpdate == null)
@@ -1249,13 +1255,13 @@
                         DateOfBirth = GuestDOB.HasValue ? DateOnly.FromDateTime(GuestDOB.Value) : null,
                         CreatedDate = DateTime.Now
                     };
-                    DbContext.Guests.Add(guest);
-                    await DbContext.SaveChangesAsync();
+                    context.Guests.Add(guest);
+                    await context.SaveChangesAsync();
 
                     var nights = GuestCheckOut.DayNumber - GuestCheckIn.DayNumber;
                     if (nights <= 0) nights = 1;
 
-                    var roomCharge = await CalculateRoomCharge(roomForUpdate.RoomId, GuestCheckIn, GuestCheckOut);
+                    var roomCharge = await CalculateRoomCharge(roomForUpdate.RoomId, GuestCheckIn, GuestCheckOut, context);
                     var serviceTotal = AvailableServices.Where(s => SelectedServiceIds.Contains(s.ServiceId)).Sum(s => s.StandardPrice);
                     var tax = Math.Round((roomCharge + serviceTotal) * 0.12m, 2);
                     var grandTotal = roomCharge + serviceTotal + tax;
@@ -1271,18 +1277,18 @@
                         CreatedDate = DateTime.Now
                     };
 
-                    DbContext.Reservations.Add(reservation);
-                    await DbContext.SaveChangesAsync();
+                    context.Reservations.Add(reservation);
+                    await context.SaveChangesAsync();
 
                     var reservedRoom = new ReservedRoom
                     {
                         ReservationId = reservation.ReservationId,
                         RoomId = roomForUpdate.RoomId
                     };
-                    DbContext.ReservedRooms.Add(reservedRoom);
+                    context.ReservedRooms.Add(reservedRoom);
 
                     roomForUpdate.Status = "Occupied";
-                    await DbContext.SaveChangesAsync();
+                    await context.SaveChangesAsync();
 
                     // Process services and deduct inventory based on service category
                     foreach (var svcId in SelectedServiceIds)
@@ -1300,11 +1306,11 @@
                             TotalAmount = svc.StandardPrice,
                             ServiceStatus = "Pending"
                         };
-                        DbContext.ServiceTransactions.Add(serviceTransaction);
-                        await DbContext.SaveChangesAsync(); // Save to get the ID
+                        context.ServiceTransactions.Add(serviceTransaction);
+                        await context.SaveChangesAsync(); // Save to get the ID
 
                         // NEW: DEDUCT INVENTORY BASED ON SERVICE CATEGORY
-                        await DeductInventoryForService(svc, roomForUpdate.RoomNumber, serviceTransaction.ServiceTransactionId);
+                        await DeductInventoryForService(svc, roomForUpdate.RoomNumber, serviceTransaction.ServiceTransactionId, context);
                     }
 
                     var bill = new Bill
@@ -1317,8 +1323,8 @@
                         BalanceDue = GuestPaymentStatus == "Paid" ? 0 : grandTotal,
                         BillStatus = GuestPaymentStatus == "Paid" ? "Paid" : "Pending"
                     };
-                    DbContext.Bills.Add(bill);
-                    await DbContext.SaveChangesAsync();
+                    context.Bills.Add(bill);
+                    await context.SaveChangesAsync();
 
                     // ========== CREATE PAYMENT RECORD ==========
                     if (GuestPaymentStatus == "Paid" || GuestPaymentStatus == "Partial")
@@ -1337,8 +1343,8 @@
                             ProcessedBy = currentUserId
                         };
 
-                        DbContext.Payments.Add(payment);
-                        await DbContext.SaveChangesAsync();
+                        context.Payments.Add(payment);
+                        await context.SaveChangesAsync();
 
                         // ========== CREATE INCOME RECORD AUTOMATICALLY ==========
                         if (GuestPaymentStatus == "Paid") // Only create income for full payments
@@ -1353,8 +1359,8 @@
                                 CreatedDate = DateTime.Now
                             };
 
-                            DbContext.Incomes.Add(income);
-                            await DbContext.SaveChangesAsync();
+                            context.Incomes.Add(income);
+                            await context.SaveChangesAsync();
                         }
                         // =======================================================
                     }
@@ -1369,7 +1375,7 @@
                         TotalAmount = roomCharge,
                         TransactionDate = DateTime.Now
                     };
-                    DbContext.BillDetails.Add(roomBillDetail);
+                    context.BillDetails.Add(roomBillDetail);
 
                     foreach (var svcId in SelectedServiceIds)
                     {
@@ -1385,14 +1391,14 @@
                             TotalAmount = svc.StandardPrice,
                             TransactionDate = DateTime.Now
                         };
-                        DbContext.BillDetails.Add(serviceBillDetail);
+                        context.BillDetails.Add(serviceBillDetail);
                     }
 
-                    await DbContext.SaveChangesAsync();
+                    await context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
                     // Clear entity tracking to prevent conflicts
-                    DbContext.ChangeTracker.Clear();
+                    context.ChangeTracker.Clear();
 
                     await SafeJsInvoke("alert", "Check-in successful!");
                     ShowGuestModal = false;
@@ -1415,7 +1421,7 @@
         }
     }
 
-    private async Task<bool> DeductInventoryForService(Service service, string roomNumber, int serviceTransactionId)
+    private async Task<bool> DeductInventoryForService(Service service, string roomNumber, int serviceTransactionId, HestiaLinkContext context)
     {
         try
         {
@@ -1423,7 +1429,7 @@
                 return true; // No category, nothing to deduct
             
             // Get inventory items for this service category
-            var inventoryItems = await DbContext.InventoryItems
+            var inventoryItems = await context.InventoryItems
                 .Where(i => i.ServiceCategoryId == service.ServiceCategoryId 
                          && i.IsServiceItem == true 
                          && i.IsActive == true)
@@ -1450,7 +1456,7 @@
                     RoomNumber = roomNumber
                 };
                 
-                DbContext.InventoryConsumptions.Add(consumption);
+                context.InventoryConsumptions.Add(consumption);
                 
                 // Update stock
                 item.CurrentStock = (item.CurrentStock ?? 0) - quantityToDeduct;
@@ -1463,7 +1469,7 @@
                 }
             }
             
-            await DbContext.SaveChangesAsync();
+            await context.SaveChangesAsync();
             return true;
         }
         catch (Exception ex)
@@ -1483,7 +1489,9 @@
             return;
         }
 
-        var roomEntity = await DbContext.Rooms
+        using var context = await DbFactory.CreateDbContextAsync();
+
+        var roomEntity = await context.Rooms
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.RoomNumber == SelectedRoom.RoomNumber);
 
@@ -1526,24 +1534,23 @@
 
         try
         {
-            // Clear entity tracking
-            DbContext.ChangeTracker.Clear();
+            using var context = await DbFactory.CreateDbContextAsync();
 
             // Get the execution strategy
-            var executionStrategy = DbContext.Database.CreateExecutionStrategy();
+            var executionStrategy = context.Database.CreateExecutionStrategy();
 
             await executionStrategy.ExecuteAsync(async () =>
             {
                 // Create transaction inside execution strategy
-                using var transaction = await DbContext.Database.BeginTransactionAsync();
+                using var transaction = await context.Database.BeginTransactionAsync();
 
                 try
                 {
                     // Clear tracking first
-                    DbContext.ChangeTracker.Clear();
+                    context.ChangeTracker.Clear();
 
                     // Find the room
-                    var roomEntity = await DbContext.Rooms
+                    var roomEntity = await context.Rooms
                         .Where(r => r.RoomNumber == SelectedRoom.RoomNumber)
                         .FirstOrDefaultAsync();
 
@@ -1556,11 +1563,11 @@
 
                     // Update room status
                     roomEntity.Status = "For Cleaning";
-                    await DbContext.SaveChangesAsync();
+                    await context.SaveChangesAsync();
 
                     // Find the active reservation for this room
-                    var reservationData = await DbContext.Reservations
-                        .Join(DbContext.ReservedRooms,
+                    var reservationData = await context.Reservations
+                        .Join(context.ReservedRooms,
                             r => r.ReservationId,
                             rr => rr.ReservationId,
                             (r, rr) => new { r, rr })
@@ -1579,10 +1586,10 @@
                         reservationData.Reservation.PaymentStatus = "Paid";
 
                         // Save reservation changes
-                        await DbContext.SaveChangesAsync();
+                        await context.SaveChangesAsync();
 
                         // Find and update the bill
-                        var bill = await DbContext.Bills
+                        var bill = await context.Bills
                             .Where(b => b.ReservationId == reservationData.Reservation.ReservationId)
                             .FirstOrDefaultAsync();
 
@@ -1592,10 +1599,10 @@
                             bill.AmountPaid = bill.GrandTotal;
                             bill.BalanceDue = 0;
 
-                            await DbContext.SaveChangesAsync();
+                            await context.SaveChangesAsync();
 
                             // Create payment record if it doesn't exist
-                            var existingPayment = await DbContext.Payments
+                            var existingPayment = await context.Payments
                                 .Where(p => p.BillId == bill.BillId && p.PaymentStatus == "Completed")
                                 .FirstOrDefaultAsync();
 
@@ -1615,8 +1622,8 @@
                                     ProcessedBy = currentUserId
                                 };
 
-                                DbContext.Payments.Add(payment);
-                                await DbContext.SaveChangesAsync();
+                                context.Payments.Add(payment);
+                                await context.SaveChangesAsync();
                             }
                             else
                             {
@@ -1636,8 +1643,8 @@
                                     CreatedDate = DateTime.Now
                                 };
 
-                                DbContext.Incomes.Add(income);
-                                await DbContext.SaveChangesAsync();
+                                context.Incomes.Add(income);
+                                await context.SaveChangesAsync();
                             }
                             // ========================================================
                         }
@@ -1647,7 +1654,7 @@
                     await transaction.CommitAsync();
 
                     // Clear entity tracking
-                    DbContext.ChangeTracker.Clear();
+                    context.ChangeTracker.Clear();
 
                     // Update UI
                     SelectedRoom.Status = "For Cleaning";
@@ -1693,9 +1700,9 @@
         return trimmed.Length <= 2 ? trimmed : trimmed.Substring(0, 2);
     }
 
-    private async Task<decimal> CalculateRoomCharge(int roomId, DateOnly checkIn, DateOnly checkOut)
+    private async Task<decimal> CalculateRoomCharge(int roomId, DateOnly checkIn, DateOnly checkOut, HestiaLinkContext context)
     {
-        var room = await DbContext.Rooms
+        var room = await context.Rooms
             .AsNoTracking()
             .Include(r => r.RoomType)
             .FirstOrDefaultAsync(r => r.RoomId == roomId);
@@ -1729,13 +1736,15 @@
 
         try
         {
-            var roomEntity = await DbContext.Rooms
+            using var context = await DbFactory.CreateDbContextAsync();
+
+            var roomEntity = await context.Rooms
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.RoomNumber == SelectedRoom.RoomNumber);
             if (roomEntity == null) return;
 
-            var reservation = await DbContext.Reservations
-                .Join(DbContext.ReservedRooms, r => r.ReservationId, rr => rr.ReservationId, (r, rr) => new { r, rr })
+            var reservation = await context.Reservations
+                .Join(context.ReservedRooms, r => r.ReservationId, rr => rr.ReservationId, (r, rr) => new { r, rr })
                 .Where(x => x.rr.RoomId == roomEntity.RoomId && x.r.Status == "Checked In")
                 .Select(x => x.r)
                 .FirstOrDefaultAsync();
@@ -1757,11 +1766,11 @@
                     TotalAmount = svc.StandardPrice,
                     ServiceStatus = "Pending"
                 };
-                DbContext.ServiceTransactions.Add(serviceTransaction);
-                await DbContext.SaveChangesAsync(); // Save to get the ID
+                context.ServiceTransactions.Add(serviceTransaction);
+                await context.SaveChangesAsync(); // Save to get the ID
 
                 // NEW: DEDUCT INVENTORY BASED ON SERVICE CATEGORY
-                await DeductInventoryForService(svc, SelectedRoom?.RoomNumber ?? "", serviceTransaction.ServiceTransactionId);
+                await DeductInventoryForService(svc, SelectedRoom?.RoomNumber ?? "", serviceTransaction.ServiceTransactionId, context);
             }
 
             var addedAmount = AvailableServices.Where(s => AddServiceSelection.Contains(s.ServiceId)).Sum(s => s.StandardPrice);

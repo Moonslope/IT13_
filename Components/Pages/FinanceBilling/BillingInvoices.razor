@@ -79,10 +79,10 @@
                             <th>Room</th>
                             <th>Check-In</th>
                             <th>Check-Out</th>
-                            <th>Subtotal</th>
-                            <th>VAT (12%)</th>
-                            <th>Service Charge (10%)</th>
-                            <th>Total Amount</th>
+                            <th style="text-align:right;">Subtotal</th>
+                            <th style="text-align:right;">VAT (12%)</th>
+                            <th style="text-align:right;">Service Charge (10%)</th>
+                            <th style="text-align:right;">Total Amount</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -96,10 +96,10 @@
                                 <td>@invoice.RoomNumber</td>
                                 <td>@invoice.CheckInDate.ToString("MMM dd, yyyy")</td>
                                 <td>@invoice.CheckOutDate.ToString("MMM dd, yyyy")</td>
-                                <td>&#8369;@invoice.Subtotal.ToString("N2")</td>
-                                <td>&#8369;@invoice.VAT.ToString("N2")</td>
-                                <td>&#8369;@invoice.ServiceCharge.ToString("N2")</td>
-                                <td style="font-weight: 900; color: var(--color-dark-teal);">&#8369;@invoice.TotalAmount.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.Subtotal.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.VAT.ToString("N2")</td>
+                                <td style="text-align:right;">&#8369;@invoice.ServiceCharge.ToString("N2")</td>
+                                <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@invoice.TotalAmount.ToString("N2")</td>
                                 <td>
                                     <span class="status-badge status-@invoice.Status.ToLower()">@invoice.Status</span>
                                 </td>

@@ -50,26 +50,26 @@
                         <table class="user-table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Inventory Item</th>
-                                    <th>Quantity Consumed</th>
-                                    <th>Unit</th>
-                                    <th>Service</th>
-                                    <th>Room Number</th>
-                                    <th>Transaction ID</th>
+                                    <th style="text-align:center;">Date</th>
+                                    <th style="text-align:center;">Inventory Item</th>
+                                    <th style="text-align:center;">Quantity Consumed</th>
+                                    <th style="text-align:center;">Unit</th>
+                                    <th style="text-align:center;">Service</th>
+                                    <th style="text-align:center;">Room Number</th>
+                                    <th style="text-align:center;">Transaction ID</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var consumption in PaginatedConsumptions)
                                 {
                                     <tr>
-                                        <td>@consumption.ConsumptionDate.ToString("yyyy-MM-dd HH:mm")</td>
-                                        <td style="font-weight:600;">@(consumption.InventoryItem?.ItemName ?? "N/A") (@(consumption.InventoryItem?.ItemCode ?? ""))</td>
-                                        <td>@consumption.QuantityConsumed</td>
-                                        <td>@(consumption.InventoryItem?.UnitOfMeasure ?? "-")</td>
-                                        <td>@(consumption.ServiceTransaction?.Service?.ServiceName ?? "N/A")</td>
-                                        <td>@(consumption.RoomNumber ?? "-")</td>
-                                        <td style="font-family:monospace;">@consumption.ServiceTransactionId</td>
+                                        <td style="text-align:center;">@consumption.ConsumptionDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td style="font-weight:600; text-align:center;">@(consumption.InventoryItem?.ItemName ?? "N/A") (@(consumption.InventoryItem?.ItemCode ?? ""))</td>
+                                        <td style="text-align:center;">@consumption.QuantityConsumed</td>
+                                        <td style="text-align:center;">@(consumption.InventoryItem?.UnitOfMeasure ?? "-")</td>
+                                        <td style="text-align:center;">@(consumption.ServiceTransaction?.Service?.ServiceName ?? "N/A")</td>
+                                        <td style="text-align:center;">@(consumption.RoomNumber ?? "-")</td>
+                                        <td style="font-family:monospace; text-align:center;">@consumption.ServiceTransactionId</td>
                                     </tr>
                                 }
                             </tbody>

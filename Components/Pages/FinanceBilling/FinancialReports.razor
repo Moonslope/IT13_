@@ -205,7 +205,7 @@
                                 <tr>
                                     <th>Payment Date</th>
                                     <th>Invoice ID</th>
-                                    <th>Amount</th>
+                                    <th style="text-align:right;">Amount</th>
                                     <th>Method</th>
                                     <th>Reference</th>
                                     <th>Status</th>
@@ -217,7 +217,7 @@
                                     <tr>
                                         <td>@payment.PaymentDate?.ToString("MMM dd, yyyy h:mm tt")</td>
                                         <td style="font-weight: 700; color: var(--color-teal);">INV-@payment.BillId?.ToString("D5")</td>
-                                        <td style="font-weight: 900; color: var(--color-dark-teal);">&#8369;@(payment.Amount?.ToString("N2") ?? "0.00")</td>
+                                        <td style="font-weight: 900; color: var(--color-dark-teal); text-align:right;">&#8369;@(payment.Amount?.ToString("N2") ?? "0.00")</td>
                                         <td>@payment.PaymentMethod</td>
                                         <td style="font-family: monospace; font-size: 0.85rem;">@payment.ReferenceNumber</td>
                                         <td><span class="status-badge status-paid">@payment.PaymentStatus</span></td>

@@ -54,15 +54,15 @@
                         <table class="user-table">
                             <thead>
                                 <tr>
-                                    <th>Purchase #</th>
-                                    <th>Item</th>
-                                    <th>Supplier</th>
-                                    <th>Quantity</th>
-                                    <th>Unit Price</th>
-                                    <th>Total Amount</th>
-                                    <th>Purchase Date</th>
-                                    <th>Received Date</th>
-                                    <th>Status</th>
+                                    <th style="text-align:center;">Purchase #</th>
+                                    <th style="text-align:center;">Item</th>
+                                    <th style="text-align:center;">Supplier</th>
+                                    <th style="text-align:center;">Quantity</th>
+                                    <th style="text-align:center;">Unit Price</th>
+                                    <th style="text-align:center;">Total Amount</th>
+                                    <th style="text-align:center;">Purchase Date</th>
+                                    <th style="text-align:center;">Received Date</th>
+                                    <th style="text-align:center;">Status</th>
                                     <th style="text-align:center;">Actions</th>
                                 </tr>
                             </thead>
@@ -70,18 +70,27 @@
                                 @foreach (var purchase in PaginatedPurchases)
                                 {
                                     <tr>
-                                        <td style="font-family:monospace; font-weight:700;">@purchase.PurchaseNumber</td>
-                                        <td style="font-weight:600;">@(purchase.InventoryItem?.ItemName ?? "N/A")</td>
-                                        <td>@(purchase.Supplier?.SupplierName ?? "-")</td>
-                                        <td>@purchase.Quantity</td>
-                                        <td>@purchase.UnitPrice.ToString("C")</td>
-                                        <td style="font-weight:700;">@(purchase.TotalAmount?.ToString("C") ?? "-")</td>
-                                        <td>@(purchase.PurchaseDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                                        <td>@(purchase.ReceivedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
-                                        <td>
-                                            <span class="status-@(purchase.PurchaseStatus.ToLower())">
-                                                @purchase.PurchaseStatus
-                                            </span>
+                                        <td style="font-family:monospace; font-weight:700; text-align:center;">@purchase.PurchaseNumber</td>
+                                        <td style="font-weight:600; text-align:center;">@(purchase.InventoryItem?.ItemName ?? "N/A")</td>
+                                        <td style="text-align:center;">@(purchase.Supplier?.SupplierName ?? "N/A")</td>
+                                        <td style="text-align:center;">@purchase.Quantity</td>
+                                        <td style="text-align:center;">@purchase.UnitPrice.ToString("C")</td>
+                                        <td style="text-align:center; font-weight:700;">@(purchase.TotalAmount?.ToString("C") ?? "-")</td>
+                                        <td style="text-align:center;">@(purchase.PurchaseDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">@(purchase.ReceivedDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                        <td style="text-align:center;">
+                                            @if (purchase.PurchaseStatus == "RECEIVED")
+                                            {
+                                                <span class="badge-active">Received</span>
+                                            }
+                                            else if (purchase.PurchaseStatus == "PENDING")
+                                            {
+                                                <span class="badge-pending">Pending</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-archived">@purchase.PurchaseStatus</span>
+                                            }
                                         </td>
                                         <td style="text-align:center;">
                                             <div style="display:flex; justify-content:center; gap:8px; align-items:center;">
@@ -184,6 +193,41 @@
     </div>
 }
 
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText = "";
     private string FilterStatus = "All";
@@ -192,6 +236,17 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private InventoryPurchase? PurchaseToProcess;
+    private enum ConfirmActionType { None, Receive, Cancel }
+    private ConfirmActionType CurrentActionType = ConfirmActionType.None;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     // Pagination
     private int CurrentPage = 1;
@@ -242,7 +297,7 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
-            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            ShowAlert($"Database Error: {ex.Message}");
             IsLoaded = true;
         }
     }
@@ -384,7 +439,7 @@
         {
             if (CurrentPurchase.ItemID == 0 || CurrentPurchase.Quantity <= 0 || CurrentPurchase.UnitPrice <= 0)
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Please fill in all required fields with valid values.");
+                ShowAlert("Please fill in all required fields with valid values.");
                 return;
             }
 
@@ -406,28 +461,60 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error saving purchase order: {ex.Message}");
+            ShowAlert($"Error saving purchase order: {ex.Message}");
         }
     }
 
-    private async Task ReceivePurchase(InventoryPurchase purchase)
+    private void ReceivePurchase(InventoryPurchase purchase)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Mark purchase order {purchase.PurchaseNumber} as received? This will update inventory stock."))
-        {
-            await InventoryService.ReceivePurchaseAsync(purchase.PurchaseID);
-            await LoadData();
-            StateHasChanged();
-        }
+        PurchaseToProcess = purchase;
+        CurrentActionType = ConfirmActionType.Receive;
+        ConfirmMessage = $"Mark purchase order {purchase.PurchaseNumber} as received? This will update inventory stock.";
+        ShowConfirmModal = true;
     }
 
-    private async Task CancelPurchase(InventoryPurchase purchase)
+    private void CancelPurchase(InventoryPurchase purchase)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Cancel purchase order {purchase.PurchaseNumber}?"))
+        PurchaseToProcess = purchase;
+        CurrentActionType = ConfirmActionType.Cancel;
+        ConfirmMessage = $"Cancel purchase order {purchase.PurchaseNumber}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (PurchaseToProcess != null)
         {
-            await InventoryService.CancelPurchaseAsync(purchase.PurchaseID);
+            if (CurrentActionType == ConfirmActionType.Receive)
+            {
+                await InventoryService.ReceivePurchaseAsync(PurchaseToProcess.PurchaseID);
+            }
+            else if (CurrentActionType == ConfirmActionType.Cancel)
+            {
+                await InventoryService.CancelPurchaseAsync(PurchaseToProcess.PurchaseID);
+            }
             await LoadData();
             StateHasChanged();
         }
+        CloseConfirmModal();
+    }
+
+    private void CloseConfirmModal()
+    {
+        ShowConfirmModal = false;
+        PurchaseToProcess = null;
+        CurrentActionType = ConfirmActionType.None;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
     }
 }
 

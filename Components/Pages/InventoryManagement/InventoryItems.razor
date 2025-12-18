@@ -55,16 +55,16 @@
                         <table class="user-table">
                             <thead>
                                 <tr>
-                                    <th>Item Code</th>
-                                    <th>Item Name</th>
-                                    <th>Category</th>
-                                    <th>Unit</th>
-                                    <th>Unit Cost</th>
-                                    <th>Current Stock</th>
-                                    <th>Reorder Point</th>
-                                    <th>Supplier</th>
-                                    <th>Service Category</th>
-                                    <th>Status</th>
+                                    <th style="text-align:center;">Item Code</th>
+                                    <th style="text-align:center;">Item Name</th>
+                                    <th style="text-align:center;">Category</th>
+                                    <th style="text-align:center;">Unit</th>
+                                    <th style="text-align:center;">Unit Cost</th>
+                                    <th style="text-align:center;">Current Stock</th>
+                                    <th style="text-align:center;">Reorder Point</th>
+                                    <th style="text-align:center;">Supplier</th>
+                                    <th style="text-align:center;">Service Category</th>
+                                    <th style="text-align:center;">Status</th>
                                     <th style="text-align:center;">Actions</th>
                                 </tr>
                             </thead>
@@ -72,12 +72,12 @@
                                 @foreach (var item in PaginatedItems)
                                 {
                                     <tr>
-                                        <td style="font-family:monospace; font-weight:700;">@item.ItemCode</td>
-                                        <td style="font-weight:600;">@item.ItemName</td>
-                                        <td>@item.Category</td>
-                                        <td>@item.UnitOfMeasure</td>
-                                        <td>@item.UnitCost.ToString("C")</td>
-                                        <td>
+                                        <td style="font-family:monospace; font-weight:700; text-align:center;">@item.ItemCode</td>
+                                        <td style="font-weight:600; text-align:center;">@item.ItemName</td>
+                                        <td style="text-align:center;">@item.Category</td>
+                                        <td style="text-align:center;">@item.UnitOfMeasure</td>
+                                        <td style="text-align:center;">@item.UnitCost.ToString("C")</td>
+                                        <td style="text-align:center;">
                                             @if ((item.CurrentStock ?? 0) <= (item.ReorderPoint ?? 0))
                                             {
                                                 <span style="color: #f59e0b; font-weight: 700;">@(item.CurrentStock ?? 0)</span>
@@ -87,10 +87,10 @@
                                                 <span>@(item.CurrentStock ?? 0)</span>
                                             }
                                         </td>
-                                        <td>@(item.ReorderPoint ?? 0)</td>
-                                        <td>@(item.Supplier?.SupplierName ?? "-")</td>
-                                        <td>@(item.ServiceCategory?.ServiceCategoryName ?? "-")</td>
-                                        <td>
+                                        <td style="text-align:center;">@(item.ReorderPoint ?? 0)</td>
+                                        <td style="text-align:center;">@(item.Supplier?.SupplierName ?? "-")</td>
+                                        <td style="text-align:center;">@(item.ServiceCategory?.ServiceCategoryName ?? "-")</td>
+                                        <td style="text-align:center;">
                                             @if ((item.IsActive ?? false))
                                             {
                                                 <span class="badge-active">Active</span>
@@ -235,6 +235,41 @@
     </div>
 }
 
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CancelAction">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText = "";
     private string FilterStatus = "Active";
@@ -243,6 +278,15 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private InventoryItem? ItemToDeactivate;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     // Pagination
     private int CurrentPage = 1;
@@ -291,7 +335,7 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
-            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            ShowAlert($"Database Error: {ex.Message}");
             IsLoaded = true;
         }
     }
@@ -402,9 +446,14 @@
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(CurrentItem.ItemCode) || string.IsNullOrWhiteSpace(CurrentItem.ItemName))
+            if (string.IsNullOrWhiteSpace(CurrentItem.ItemCode) || 
+                string.IsNullOrWhiteSpace(CurrentItem.ItemName) || 
+                CurrentItem.CurrentStock == null || 
+                CurrentItem.ReorderPoint == null ||
+                CurrentItem.SupplierID == null || 
+                CurrentItem.SupplierID == 0)
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Please fill in all required fields.");
+                ShowAlert("Please fill in all required fields (Code, Name, Stock, Reorder Point, Supplier).");
                 return;
             }
 
@@ -423,18 +472,44 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error saving item: {ex.Message}");
+            ShowAlert($"Error saving item: {ex.Message}");
         }
     }
 
-    private async Task DeactivateItem(InventoryItem item)
+    private void DeactivateItem(InventoryItem item)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to deactivate {item.ItemName}?"))
+        ItemToDeactivate = item;
+        ConfirmMessage = $"Are you sure you want to deactivate {item.ItemName}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (ItemToDeactivate != null)
         {
-            await InventoryService.DeactivateItemAsync(item.ItemId);
+            await InventoryService.DeactivateItemAsync(ItemToDeactivate.ItemId);
             await LoadData();
             StateHasChanged();
         }
+        ShowConfirmModal = false;
+        ItemToDeactivate = null;
+    }
+
+    private void CancelAction()
+    {
+        ShowConfirmModal = false;
+        ItemToDeactivate = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
     }
 
     private async Task ActivateItem(InventoryItem item)

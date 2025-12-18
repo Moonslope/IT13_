@@ -146,6 +146,41 @@
     </div>
 }
 
+@if (ShowConfirmModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmAction">Confirm</button>
+                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowAlertModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header-teal">
+                <h2 style="margin:0; font-size:1.2rem; color: white;">Notification</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin: 0; font-size: 1rem; color: #374151;">@AlertMessage</p>
+            </div>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
+                <button class="btn-primary" @onclick="CloseAlertModal">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private string SearchText = "";
     private int FilterService = 0;
@@ -153,6 +188,15 @@
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+
+    // Confirmation Modal
+    private bool ShowConfirmModal = false;
+    private string ConfirmMessage = "";
+    private ServiceInventory? LinkToRemove;
+
+    // Alert Modal
+    private bool ShowAlertModal = false;
+    private string AlertMessage = "";
 
     // Pagination
     private int CurrentPage = 1;
@@ -205,7 +249,7 @@
         {
             HasError = true;
             ErrorMessage = ex.Message;
-            await JSRuntime.InvokeVoidAsync("alert", $"Database Error: {ex.Message}");
+            ShowAlert($"Database Error: {ex.Message}");
             IsLoaded = true;
         }
     }
@@ -284,7 +328,7 @@
         {
             if (SelectedServiceId == 0 || SelectedItemId == 0 || QuantityRequired <= 0)
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Please fill in all required fields.");
+                ShowAlert("Please fill in all required fields.");
                 return;
             }
 
@@ -296,18 +340,43 @@
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error creating link: {ex.Message}");
+            ShowAlert($"Error creating link: {ex.Message}");
         }
     }
 
-    private async Task RemoveLink(ServiceInventory link)
+    private void RemoveLink(ServiceInventory link)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"Remove link between {link.Service?.ServiceName} and {link.InventoryItem?.ItemName}?"))
+        LinkToRemove = link;
+        ConfirmMessage = $"Remove link between {link.Service?.ServiceName} and {link.InventoryItem?.ItemName}?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ConfirmAction()
+    {
+        if (LinkToRemove != null)
         {
-            await InventoryService.RemoveServiceInventoryLinkAsync(link.ServiceInventoryId);
+            await InventoryService.RemoveServiceInventoryLinkAsync(LinkToRemove.ServiceInventoryId);
             await LoadData();
             StateHasChanged();
         }
+        CloseConfirmModal();
+    }
+
+    private void CloseConfirmModal()
+    {
+        ShowConfirmModal = false;
+        LinkToRemove = null;
+    }
+
+    private void ShowAlert(string message)
+    {
+        AlertMessage = message;
+        ShowAlertModal = true;
+    }
+
+    private void CloseAlertModal()
+    {
+        ShowAlertModal = false;
     }
 }
 
