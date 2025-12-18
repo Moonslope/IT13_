@@ -105,7 +105,7 @@
         </div>
         
         <Pagination CurrentPage="@CurrentPage" 
-                    TotalItems="@FilteredRooms.ToList().Count" 
+                     TotalItems="@(FilteredRooms?.Count() ?? 0)" 
                     ItemsPerPage="@ItemsPerPage"
                     OnPageChanged="@OnPageChanged"
                     OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />

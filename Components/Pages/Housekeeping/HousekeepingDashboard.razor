@@ -779,17 +779,17 @@
             IsProcessing = true;
             StateHasChanged();
 
-            var result = await HousekeepingService.CompleteTaskAsync(
+            var result = await HousekeepingService.ReportMaintenanceIssueAsync(
                 SelectedTask.TaskID,
                 UserSession.UserID,
-                "Maintenance Required");
+                MaintenanceNotes);
 
             CloseModals();
 
             if (result.Success)
             {
                 await LoadData();
-                await JSRuntime.InvokeVoidAsync("alert", "Issue reported!");
+                await JSRuntime.InvokeVoidAsync("alert", "Issue reported to admin!");
             }
             else
             {

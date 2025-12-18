@@ -43,6 +43,7 @@ public partial class HestiaLinkContext : DbContext
     public virtual DbSet<Supplier> Suppliers { get; set; }
     public virtual DbSet<InventoryPurchase> InventoryPurchases { get; set; }
     public virtual DbSet<CleaningTask> CleaningTasks { get; set; }
+    public virtual DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
     public virtual DbSet<Tax> Taxes { get; set; }
     public virtual DbSet<TotalIncome> TotalIncomes { get; set; }
 
@@ -116,6 +117,9 @@ public partial class HestiaLinkContext : DbContext
 
         // Housekeeping - Map to Task table
         modelBuilder.Entity<CleaningTask>().ToTable("Task");
+
+        // Maintenance
+        modelBuilder.Entity<MaintenanceRequest>().ToTable("MaintenanceRequest");
 
         // Supplier configuration
         modelBuilder.Entity<Supplier>(entity =>

@@ -109,7 +109,7 @@
                         @if (FilteredCategories.Count > 0)
                         {
                             <Pagination CurrentPage="@CurrentPage" 
-                                        TotalItems="@FilteredCategories.Count" 
+                                        TotalItems="@(FilteredCategories?.Count() ?? 0)" 
                                         ItemsPerPage="@ItemsPerPage"
                                         OnPageChanged="@OnPageChanged"
                                         OnItemsPerPageChangedCallback="@OnItemsPerPageChanged" />
@@ -175,19 +175,25 @@
     </div>
 }
 
+
+
 @if (ShowConfirmModal)
 {
     <div class="modal-overlay">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header-teal" style="background-color: var(--color-danger, #ef4444);">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header-teal">
                 <h2 style="margin:0; font-size:1.2rem; color: white;">Confirm Action</h2>
             </div>
-            <div style="padding: 24px;">
-                <p style="margin: 0; font-size: 1rem; color: #374151;">@ConfirmMessage</p>
+            <div style="padding: 24px; text-align: center;">
+                <p style="margin: 0; font-size: 1.1rem; color: #374151;">@ConfirmMessage</p>
+                @if (ConfirmActionType == "Archive")
+                {
+                    <p style="margin-top: 10px; font-size: 0.85rem; color: #6b7280;">This will mark the category as inactive.</p>
+                }
             </div>
-            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px;">
-                <button class="btn-primary" style="background-color: var(--color-danger, #ef4444);" @onclick="ConfirmDeleteAction">Confirm</button>
-                <button class="btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+            <div class="action-footer" style="border:none; padding-bottom:0; margin-top:10px; justify-content: center; gap: 15px;">
+                <button class="btn-primary" @onclick="ExecuteConfirmedAction" style="min-width: 100px;">Yes, Confirm</button>
+                <button class="btn-secondary" @onclick="CloseConfirmModal" style="min-width: 100px;">Cancel</button>
             </div>
         </div>
     </div>
@@ -219,10 +225,13 @@
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
 
+
+
     // Confirmation Modal
     private bool ShowConfirmModal = false;
     private string ConfirmMessage = "";
-    private ServiceCategory? CategoryToDelete;
+    private string ConfirmActionType = ""; // "Archive" or "Unarchive"
+    private ServiceCategory? CategoryToProcess;
 
     // Alert Modal
     private bool ShowAlertModal = false;
@@ -421,20 +430,23 @@
         }
     }
 
-    private async Task ArchiveCategory(ServiceCategory category)
+    private void ArchiveCategory(ServiceCategory category)
     {
+        CategoryToProcess = category;
+        ConfirmActionType = "Archive";
+        ConfirmMessage = $"Are you sure you want to archive category '{category.ServiceCategoryName}'?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ExecuteArchive()
+    {
+        if (CategoryToProcess == null) return;
         try
         {
-            if (!await JSRuntime.InvokeAsync<bool>("confirm", 
-                $"Are you sure you want to archive category '{category.ServiceCategoryName}'? This will mark it as inactive."))
-            {
-                return;
-            }
-
             await DualWriteService.ExecuteDualWriteAsync(async (context) =>
             {
                 var existing = await context.ServiceCategories
-                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == category.ServiceCategoryId);
+                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == CategoryToProcess.ServiceCategoryId);
                 
                 if (existing != null)
                 {
@@ -442,31 +454,34 @@
                     existing.UpdatedAt = DateTime.UtcNow;
                     await context.SaveChangesAsync();
                 }
-            }, "ServiceCategory", category);
+            }, "ServiceCategory", CategoryToProcess);
 
             await LoadData();
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error archiving category: {ex.Message}");
+            ShowAlert($"Error archiving category: {ex.Message}");
         }
     }
 
-    private async Task UnarchiveCategory(ServiceCategory category)
+    private void UnarchiveCategory(ServiceCategory category)
     {
+        CategoryToProcess = category;
+        ConfirmActionType = "Unarchive";
+        ConfirmMessage = $"Are you sure you want to restore category '{category.ServiceCategoryName}'?";
+        ShowConfirmModal = true;
+    }
+
+    private async Task ExecuteUnarchive()
+    {
+        if (CategoryToProcess == null) return;
         try
         {
-            if (!await JSRuntime.InvokeAsync<bool>("confirm", 
-                $"Are you sure you want to unarchive category '{category.ServiceCategoryName}'? This will mark it as active."))
-            {
-                return;
-            }
-
             await DualWriteService.ExecuteDualWriteAsync(async (context) =>
             {
                 var existing = await context.ServiceCategories
-                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == category.ServiceCategoryId);
+                    .FirstOrDefaultAsync(c => c.ServiceCategoryId == CategoryToProcess.ServiceCategoryId);
                 
                 if (existing != null)
                 {
@@ -474,39 +489,35 @@
                     existing.UpdatedAt = DateTime.UtcNow;
                     await context.SaveChangesAsync();
                 }
-            }, "ServiceCategory", category);
+            }, "ServiceCategory", CategoryToProcess);
 
             await LoadData();
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Error unarchiving category: {ex.Message}");
+            ShowAlert($"Error unarchiving category: {ex.Message}");
         }
+    }
+
+    private async Task ExecuteConfirmedAction()
+    {
+        ShowConfirmModal = false;
+        if (ConfirmActionType == "Archive")
+            await ExecuteArchive();
+        else if (ConfirmActionType == "Unarchive")
+            await ExecuteUnarchive();
+        
+        CategoryToProcess = null;
     }
 
     private void CloseConfirmModal()
     {
         ShowConfirmModal = false;
-        CategoryToDelete = null;
+        CategoryToProcess = null;
     }
 
-    private async Task ConfirmDeleteAction()
-    {
-        if (CategoryToDelete != null)
-        {
-            // If category is active, archive it; otherwise unarchive it
-            if ((CategoryToDelete.Status ?? "Active").Equals("Active", StringComparison.OrdinalIgnoreCase))
-            {
-                await ArchiveCategory(CategoryToDelete);
-            }
-            else
-            {
-                await UnarchiveCategory(CategoryToDelete);
-            }
-        }
-        CloseConfirmModal();
-    }
+
 
     private void ShowAlert(string message)
     {

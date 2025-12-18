@@ -188,7 +188,19 @@
                                 </div>
                                 <div class="room-meta">
                                     <div><span class="meta-label">Type:</span> @(room.RoomType?.TypeName ?? "Standard")</div>
-                                    <div><span class="meta-label">Status:</span> Under Maintenance</div>
+                                    @if (MaintenanceRequests.Any(m => m.RoomID == room.RoomID))
+                                    {
+                                        var req = MaintenanceRequests.First(m => m.RoomID == room.RoomID);
+                                        <div style="margin-top:8px; border-top:1px solid #fee2e2; pt-2;">
+                                            <div style="font-weight:700; color:#991b1b; font-size:0.85rem; margin-top:8px;">REPORTED ISSUE:</div>
+                                            <div style="font-style:italic; color:#b91c1c; font-size:0.9rem;">"@req.Description"</div>
+                                            <div style="font-size:0.75rem; color:#ef4444; margin-top:4px;">By: @(req.ReportedByUser?.Username ?? "Staff") on @req.ReportedDate.ToString("MMM dd, HH:mm")</div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div><span class="meta-label">Status:</span> Under Maintenance</div>
+                                    }
                                 </div>
                                 <div class="room-actions">
                                     <button class="btn-room-primary" @onclick="() => ResolveMaintenanceRoom(room)">Resolve Issue</button>
@@ -807,6 +819,7 @@
     private List<HestiaLink.Models.Room> RoomsUnderMaintenance = new();
     private List<CleaningTask> ActiveTasks = new();
     private List<SystemUser> AvailableHousekeepers = new();
+    private List<MaintenanceRequest> MaintenanceRequests = new();
 
     private string ActiveTab = "cleaning";
     private bool ShowAssignModal = false;
@@ -825,6 +838,20 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (!UserSession.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/loginpage");
+            return;
+        }
+
+        // Only Admin, Front Desk can manage the schedule (as per general hotel logic)
+        // Adjust if Housekeeping leads can also access it.
+        if (UserSession.Role != "Administrator" && UserSession.Role != "FrontDesk")
+        {
+            Navigation.NavigateTo("/housekeeping/dashboard");
+            return;
+        }
+
         await LoadData();
     }
 
@@ -848,6 +875,7 @@
             RoomsUnderMaintenance = await HousekeepingService.GetRoomsUnderMaintenanceAsync();
             ActiveTasks = await HousekeepingService.GetActiveTasksAsync();
             AvailableHousekeepers = await HousekeepingService.GetAvailableHousekeepersAsync();
+            MaintenanceRequests = await HousekeepingService.GetActiveMaintenanceRequestsAsync();
 
             IsLoaded = true;
         }
@@ -1056,20 +1084,19 @@
             IsProcessing = true;
             StateHasChanged();
 
-            // Note: MaintenanceNotes are collected but not currently stored due to schema limitations.
-            // In a future update, we should save these to a MaintenanceLog table.
+            // Resolution notes are now stored in the MaintenanceRequest record.
 
-            var success = await HousekeepingService.UpdateRoomStatusAsync(SelectedRoom.RoomID, "Available");
+            var result = await HousekeepingService.ResolveMaintenanceIssueAsync(SelectedRoom.RoomID, MaintenanceNotes);
 
-            if (success)
+            if (result.Success)
             {
                 ShowResolveMaintenanceModal = false;
                 await LoadData();
-                await JSRuntime.InvokeVoidAsync("alert", $"Room {SelectedRoom.RoomNumber} issue resolved and marked available!");
+                await JSRuntime.InvokeVoidAsync("alert", result.Message);
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Failed to update room status.");
+                await JSRuntime.InvokeVoidAsync("alert", result.Message);
             }
         }
         catch (Exception ex)
