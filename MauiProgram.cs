@@ -35,6 +35,12 @@ namespace HestiaIT13Final
             // Add Housekeeping Service
             builder.Services.AddScoped<HousekeepingService>();
 
+            // Add Employee DTR Service
+            builder.Services.AddScoped<EmployeeDTRService>();
+
+            // Add Payroll Batch Service
+            builder.Services.AddScoped<PayrollBatchService>();
+
             // Add database context with connection string
             var localConnectionString = "Data Source=MSI\\SQLEXPRESS;Initial Catalog=IT13;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False;Command Timeout=30";
             

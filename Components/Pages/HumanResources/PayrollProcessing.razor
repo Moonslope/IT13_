@@ -77,6 +77,9 @@
                 </div>
                 <button class="btn-secondary" style="background: #f59e0b; color: white;" @onclick="OpenTaxModal"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg> Manage Taxes</button>
                 <button class="btn-primary" @onclick="LoadPayrollData"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg> Load Payroll</button>
+                <button class="btn-primary" style="background: #10b981; border-color: #10b981;" @onclick="OpenMarkAllPaidModal" disabled="@IsProcessing">
+                    <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Mark All as Paid
+                </button>
             </div>
         </div>
 
@@ -375,6 +378,56 @@
     </div>
 }
 
+<!-- Mark All as Paid Confirmation Modal -->
+@if (ShowConfirmMarkAllPaidModal)
+{
+    <div class="modal-overlay" @onclick="CloseMarkAllPaidModal">
+        <div class="modal-content modal-confirm" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Confirm Mark All as Paid</h3>
+                <button class="modal-close" @onclick="CloseMarkAllPaidModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirm-message">
+                    <div class="confirm-icon warning">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                    </div>
+                    <p><strong>Are you sure you want to mark ALL payroll records as 'Paid'?</strong></p>
+                    <p style="color: #64748b; margin-top: 12px;">
+                        This will mark all payroll records in the selected period as "Paid".<br/>
+                        <strong style="color: #dc2626;">This action cannot be undone.</strong>
+                    </p>
+                    <div class="confirm-details" style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #64748b; font-weight: 600;">Period:</span>
+                            <span style="font-weight: 700;">@GetPeriodDisplay()</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #64748b; font-weight: 600;">Records to update:</span>
+                            <span style="font-weight: 700; color: #059669;">@GetPendingPayrollCount() pending</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseMarkAllPaidModal" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-primary btn-confirm-paid" @onclick="ConfirmMarkAllAsPaid" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <span>Yes, Mark All as Paid</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
     /* Summary Cards - Matching Suppliers Style */
     .summary-cards {
@@ -511,6 +564,112 @@
         font-size: 0.8rem;
         font-weight: 600;
     }
+
+    .modal-confirm {
+        max-width: 500px;
+    }
+
+    .confirm-message {
+        text-align: center;
+        padding: 20px 0;
+    }
+
+    .confirm-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+
+    .confirm-icon.warning {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .confirm-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .confirm-details {
+        text-align: left;
+    }
+
+    .btn-confirm-paid {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        color: #1e293b;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 28px;
+        color: #64748b;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+    .modal-close:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
 </style>
 
 @code {
@@ -527,9 +686,11 @@
     private int ItemsPerPage = 10;
     private bool ShowTaxModal = false;
     private bool ShowEmployeePaymentModal = false;
+    private bool ShowConfirmMarkAllPaidModal = false;
     private bool IsLoaded = false;
     private bool HasError = false;
     private string ErrorMessage = string.Empty;
+    private bool IsProcessing = false;
 
     // Summary Calculations
     private decimal TotalIncome = 0m;
@@ -1094,6 +1255,155 @@
         {
             Console.WriteLine($"Error refreshing payroll view: {ex.Message}");
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private void OpenMarkAllPaidModal()
+    {
+        ShowConfirmMarkAllPaidModal = true;
+    }
+
+    private void CloseMarkAllPaidModal()
+    {
+        ShowConfirmMarkAllPaidModal = false;
+    }
+
+    private string GetPeriodDisplay()
+    {
+        try
+        {
+            var periodStart = DateTime.Parse(SelectedPeriod);
+            var periodEnd = periodStart.AddDays(14);
+            return $"{periodStart:MMM dd} - {periodEnd:MMM dd, yyyy}";
+        }
+        catch
+        {
+            return "Selected period";
+        }
+    }
+
+    private int GetPendingPayrollCount()
+    {
+        try
+        {
+            var periodStart = DateTime.Parse(SelectedPeriod);
+            var periodEnd = periodStart.AddDays(14);
+            var periodStartDate = DateOnly.FromDateTime(periodStart);
+            var periodEndDate = DateOnly.FromDateTime(periodEnd);
+
+            return EmployeePayrollSummary
+                .Count(e => e.PaymentStatus != "Paid" && 
+                           (e.PaymentStatus == "Pending" || e.PaymentStatus == "Processing" || e.PaymentStatus == "On Hold"));
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private async Task ConfirmMarkAllAsPaid()
+    {
+        try
+        {
+            ShowConfirmMarkAllPaidModal = false;
+            IsProcessing = true;
+            StateHasChanged();
+
+            // Get the current period dates
+            var periodStart = DateTime.Parse(SelectedPeriod);
+            var periodEnd = periodStart.AddDays(14);
+            var periodStartDate = DateOnly.FromDateTime(periodStart);
+            var periodEndDate = DateOnly.FromDateTime(periodEnd);
+
+            // Get all payroll records for this period that are not already "Paid"
+            var payrollRecords = await Context.Payrolls
+                .Include(p => p.Attendance)
+                    .ThenInclude(a => a.Schedule)
+                .Where(p => p.PeriodStart == periodStartDate && 
+                           p.PeriodEnd == periodEndDate &&
+                           p.Status != "Paid" &&
+                           p.Attendance.Schedule != null)
+                .ToListAsync();
+
+            if (!payrollRecords.Any())
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "No payroll records found that need to be marked as Paid.");
+                IsProcessing = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Get TotalIncome record for this period
+            var totalIncome = await Context.TotalIncomes
+                .FirstOrDefaultAsync(ti => ti.PeriodStart == periodStartDate && ti.PeriodEnd == periodEndDate);
+
+            int? incomeId = totalIncome?.IncomeId;
+
+            // If no TotalIncome record exists, create one
+            if (incomeId == null)
+            {
+                var newTotalIncome = new HestiaLink.Models.TotalIncome
+                {
+                    PeriodStart = periodStartDate,
+                    PeriodEnd = periodEndDate,
+                    TotalAmount = 100000m, // Default starting amount
+                    Status = "Active",
+                    CreatedDate = DateTime.Now
+                };
+                Context.TotalIncomes.Add(newTotalIncome);
+                await Context.SaveChangesAsync();
+                incomeId = newTotalIncome.IncomeId;
+                totalIncome = newTotalIncome;
+            }
+
+            int updatedCount = 0;
+            decimal totalGrossPay = 0;
+
+            // Update each payroll record
+            foreach (var payroll in payrollRecords)
+            {
+                var oldStatus = payroll.Status;
+                
+                // Update status to Paid
+                payroll.Status = "Paid";
+                
+                // Update IncomeId if not set
+                if (payroll.IncomeId == null)
+                {
+                    payroll.IncomeId = incomeId;
+                }
+
+                // Handle TotalIncome adjustment - subtract gross pay when marking as Paid
+                if (totalIncome != null && oldStatus != "Paid" && payroll.GrossPay.HasValue)
+                {
+                    totalIncome.TotalAmount = (totalIncome.TotalAmount ?? 0) - payroll.GrossPay.Value;
+                    if (totalIncome.TotalAmount < 0) totalIncome.TotalAmount = 0;
+                    totalGrossPay += payroll.GrossPay.Value;
+                }
+
+                updatedCount++;
+            }
+
+            // Save all changes
+            await Context.SaveChangesAsync();
+
+            // Refresh the view data
+            await RefreshPayrollViewData();
+
+            // Recalculate summary totals
+            await CalculateSummaryTotals();
+
+            IsProcessing = false;
+            StateHasChanged();
+
+            await JSRuntime.InvokeVoidAsync("alert", 
+                $"Successfully marked {updatedCount} payroll record(s) as Paid. Total amount: ₱{totalGrossPay:N2}");
+        }
+        catch (Exception ex)
+        {
+            IsProcessing = false;
+            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("alert", $"Error marking all as paid: {ex.Message}");
         }
     }
 }

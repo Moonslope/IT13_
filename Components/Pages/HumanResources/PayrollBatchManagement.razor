@@ -1,0 +1,545 @@
+@page "/hr/payroll-batch-management"
+@using HestiaLink.Data
+@using HestiaLink.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Infrastructure
+@using HestiaLink.Services
+@inject IDbContextFactory<HestiaLinkContext> ContextFactory
+@inject PayrollBatchService PayrollBatchService
+@inject UserSession UserSession
+@inject IJSRuntime JSRuntime
+@layout MainLayout
+
+<div class="page-wrapper">
+    <header class="page-topbar">
+        <div>
+            <h1>Payroll Batch Management</h1>
+            <span class="page-topbar-subtitle">Monthly Payroll Processing</span>
+        </div>
+        <UserDropdown />
+    </header>
+
+    <section class="page-content">
+        <!-- Action Bar -->
+        <div class="page-action-bar">
+            <button class="btn-primary" @onclick="OpenCreateBatchModal">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Create Monthly Batch
+            </button>
+        </div>
+
+        <!-- Batches List -->
+        <div class="data-card">
+            <div class="data-card-header">
+                <h2>Payroll Batches</h2>
+                <div class="data-card-filter">
+                    <select class="form-select" @bind="StatusFilter" @bind:after="LoadBatches">
+                        <option value="">All Statuses</option>
+                        <option value="Draft">Draft</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+
+            @if (!IsLoaded)
+            {
+                <div class="loading-state">Loading batches...</div>
+            }
+            else if (Batches.Any())
+            {
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Batch Name</th>
+                                <th>Period</th>
+                                <th>Entries</th>
+                                <th>Total Amount</th>
+                                <th>Status</th>
+                                <th>Processed Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var batch in Batches)
+                            {
+                                <tr>
+                                    <td><strong>@batch.BatchName</strong></td>
+                                    <td>@batch.PeriodStart.ToString("MMM dd") - @batch.PeriodEnd.ToString("MMM dd, yyyy")</td>
+                                    <td>@(batch.EntryCount ?? 0)</td>
+                                    <td>₱@((batch.TotalAmount ?? 0).ToString("N2"))</td>
+                                    <td>
+                                        <span class="batch-status batch-status-@batch.Status.ToLower()">
+                                            @batch.Status
+                                        </span>
+                                    </td>
+                                    <td>@(batch.ProcessedDate?.ToString("MMM dd, yyyy") ?? "-")</td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn-icon-view" @onclick="() => ViewBatchDetails(batch.PayrollBatchId)" title="View Details">
+                                                <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                                            </button>
+                                            @if (batch.Status == "Draft")
+                                            {
+                                                <button class="btn-icon-process" @onclick="() => ProcessBatch(batch.PayrollBatchId)" title="Process Batch">
+                                                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                                </button>
+                                                <button class="btn-icon-delete" @onclick="() => DeleteBatch(batch.PayrollBatchId)" title="Delete Batch">
+                                                    <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="no-data">No payroll batches found</div>
+            }
+        </div>
+    </section>
+</div>
+
+<!-- Create Batch Modal -->
+@if (ShowCreateModal)
+{
+    <div class="modal-overlay" @onclick="CloseCreateModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Create Monthly Payroll Batch</h3>
+                <button class="modal-close" @onclick="CloseCreateModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Batch Name</label>
+                    <input type="text" class="form-input" @bind="NewBatchName" placeholder="e.g., January 2025 Payroll" />
+                </div>
+                <div class="form-group">
+                    <label>Period Start</label>
+                    <input type="date" class="form-input" @bind="NewBatchPeriodStart" />
+                </div>
+                <div class="form-group">
+                    <label>Period End</label>
+                    <input type="date" class="form-input" @bind="NewBatchPeriodEnd" />
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" @bind="IncludeAllEmployees" />
+                        Include all active employees
+                    </label>
+                </div>
+                @if (!IncludeAllEmployees)
+                {
+                    <div class="form-group">
+                        <label>Select Employees</label>
+                        <div class="employee-select-list">
+                            @foreach (var emp in AvailableEmployees)
+                            {
+                                <label class="checkbox-label">
+                                    <input type="checkbox" 
+                                           checked="@SelectedEmployeeIds.Contains(emp.EmployeeId)"
+                                           @onchange="@((ChangeEventArgs e) => ToggleEmployee(emp.EmployeeId, (bool)(e.Value ?? false)))" />
+                                    <span>@emp.FirstName @emp.LastName (@emp.Position?.PositionTitle)</span>
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <textarea class="form-input" @bind="NewBatchNotes" rows="3" placeholder="Additional notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseCreateModal">Cancel</button>
+                <button class="btn-primary" @onclick="CreateBatch" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create Batch</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Batch Details Modal -->
+@if (ShowDetailsModal && SelectedBatch != null)
+{
+    <div class="modal-overlay" @onclick="CloseDetailsModal">
+        <div class="modal-content modal-large" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Batch Details: @SelectedBatch.BatchName</h3>
+                <button class="modal-close" @onclick="CloseDetailsModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="batch-info-grid">
+                    <div class="info-item">
+                        <label>Status:</label>
+                        <span class="batch-status batch-status-@SelectedBatch.Status.ToLower()">@SelectedBatch.Status</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Period:</label>
+                        <span>@SelectedBatch.PeriodStart.ToString("MMM dd") - @SelectedBatch.PeriodEnd.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Total Entries:</label>
+                        <span>@(SelectedBatch.EntryCount ?? 0)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Total Amount:</label>
+                        <span class="amount-highlight">₱@((SelectedBatch.TotalAmount ?? 0).ToString("N2"))</span>
+                    </div>
+                </div>
+
+                @if (BatchEntries.Any())
+                {
+                    <div class="entries-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Regular Hours</th>
+                                    <th>Overtime Hours</th>
+                                    <th>Gross Pay</th>
+                                    <th>Tax</th>
+                                    <th>Net Pay</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in BatchEntries)
+                                {
+                                    <tr>
+                                        <td>@entry.Employee?.FirstName @entry.Employee?.LastName</td>
+                                        <td>@((entry.RegularHours ?? 0).ToString("F2"))</td>
+                                        <td>@((entry.OvertimeHours ?? 0).ToString("F2"))</td>
+                                        <td>₱@((entry.GrossPay ?? 0).ToString("N2"))</td>
+                                        <td>₱@((entry.TaxAmount ?? 0).ToString("N2"))</td>
+                                        <td><strong>₱@((entry.NetPay ?? 0).ToString("N2"))</strong></td>
+                                        <td>
+                                            <span class="batch-status batch-status-@entry.Status.ToLower()">
+                                                @entry.Status
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="CloseDetailsModal">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .page-action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .batch-status {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .batch-status-draft {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .batch-status-processing {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .batch-status-completed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .batch-status-cancelled {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon-view,
+    .btn-icon-process,
+    .btn-icon-delete {
+        padding: 6px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .btn-icon-view {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .btn-icon-view:hover {
+        background: #bae6fd;
+    }
+
+    .btn-icon-process {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .btn-icon-process:hover {
+        background: #a7f3d0;
+    }
+
+    .btn-icon-delete {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .btn-icon-delete:hover {
+        background: #fecaca;
+    }
+
+    .btn-icon-view svg,
+    .btn-icon-process svg,
+    .btn-icon-delete svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .modal-large {
+        max-width: 900px;
+        width: 90%;
+    }
+
+    .batch-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 8px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .info-item label {
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .amount-highlight {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #059669;
+    }
+
+    .entries-table-container {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+
+    .employee-select-list {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        cursor: pointer;
+    }
+
+    .checkbox-label:hover {
+        background: #f8fafc;
+        border-radius: 4px;
+    }
+</style>
+
+@code {
+    private List<PayrollBatch> Batches = new();
+    private PayrollBatch? SelectedBatch;
+    private List<PayrollEntry> BatchEntries = new();
+    private List<Employee> AvailableEmployees = new();
+    private bool IsLoaded = false;
+    private bool IsProcessing = false;
+    private bool ShowCreateModal = false;
+    private bool ShowDetailsModal = false;
+    private string StatusFilter = "";
+    private string NewBatchName = "";
+    private DateOnly NewBatchPeriodStart = DateOnly.FromDateTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1));
+    private DateOnly NewBatchPeriodEnd = DateOnly.FromDateTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month)));
+    private bool IncludeAllEmployees = true;
+    private HashSet<int> SelectedEmployeeIds = new();
+    private string NewBatchNotes = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBatches();
+        await LoadEmployees();
+    }
+
+    private async Task LoadBatches()
+    {
+        try
+        {
+            // PayrollBatch table doesn't exist - return empty list for now
+            Batches = new List<PayrollBatch>();
+            IsLoaded = true;
+            
+            // Show message that feature is not available
+            await JSRuntime.InvokeVoidAsync("alert", 
+                "Payroll Batch Management requires the PayrollBatch and PayrollEntry tables to be created in the database. " +
+                "Please run the SQL migration script to enable this feature.");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error loading batches: {ex.Message}");
+            IsLoaded = true;
+        }
+    }
+
+    private async Task LoadEmployees()
+    {
+        try
+        {
+            using var context = ContextFactory.CreateDbContext();
+            AvailableEmployees = await context.Employees
+                .Include(e => e.Position)
+                .Where(e => e.Status == "Active")
+                .OrderBy(e => e.LastName)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error loading employees: {ex.Message}");
+        }
+    }
+
+    private void OpenCreateBatchModal()
+    {
+        // Set default to current month
+        var now = DateTime.Now;
+        NewBatchPeriodStart = DateOnly.FromDateTime(new DateTime(now.Year, now.Month, 1));
+        NewBatchPeriodEnd = DateOnly.FromDateTime(new DateTime(now.Year, now.Month, DateTime.DaysInMonth(now.Year, now.Month)));
+        NewBatchName = $"{now:MMMM yyyy} Payroll";
+        IncludeAllEmployees = true;
+        SelectedEmployeeIds.Clear();
+        NewBatchNotes = "";
+        ShowCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        ShowCreateModal = false;
+    }
+
+    private void ToggleEmployee(int employeeId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            SelectedEmployeeIds.Add(employeeId);
+        }
+        else
+        {
+            SelectedEmployeeIds.Remove(employeeId);
+        }
+    }
+
+    private async Task CreateBatch()
+    {
+        await JSRuntime.InvokeVoidAsync("alert", 
+            "Payroll Batch Management requires the PayrollBatch and PayrollEntry tables to be created in the database. " +
+            "Please run the SQL migration script to enable this feature.");
+        CloseCreateModal();
+    }
+
+    private async Task ViewBatchDetails(int batchId)
+    {
+        await JSRuntime.InvokeVoidAsync("alert", 
+            "Payroll Batch Management requires the PayrollBatch and PayrollEntry tables to be created in the database.");
+    }
+
+    private void CloseDetailsModal()
+    {
+        ShowDetailsModal = false;
+        SelectedBatch = null;
+        BatchEntries.Clear();
+    }
+
+    private async Task ProcessBatch(int batchId)
+    {
+        await JSRuntime.InvokeVoidAsync("alert", 
+            "Payroll Batch Management requires the PayrollBatch and PayrollEntry tables to be created in the database.");
+    }
+
+    private async Task DeleteBatch(int batchId)
+    {
+        try
+        {
+            var batch = Batches.FirstOrDefault(b => b.PayrollBatchId == batchId);
+            if (batch == null) return;
+
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", 
+                $"Are you sure you want to delete the batch '{batch.BatchName}'? This action cannot be undone."))
+            {
+                return;
+            }
+
+            // Since PayrollBatch table doesn't exist, show message
+            await JSRuntime.InvokeVoidAsync("alert", 
+                "Payroll Batch Management requires the PayrollBatch and PayrollEntry tables to be created in the database. " +
+                "Please run the SQL migration script to enable batch deletion.");
+            
+            // If tables existed, we would call:
+            // var result = await PayrollBatchService.DeleteBatchAsync(batchId);
+            // await JSRuntime.InvokeVoidAsync("alert", result.Message);
+            // if (result.Success) await LoadBatches();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error deleting batch: {ex.Message}");
+        }
+    }
+}
+

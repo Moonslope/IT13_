@@ -526,6 +526,95 @@ namespace HestiaLink.Services
         }
 
         /// <summary>
+        /// Updates purchase order status to the next status in the cycle.
+        /// Cycle: PENDING -> ORDERED -> FOR DELIVERY -> RECEIVED
+        /// </summary>
+        public async Task<bool> UpdatePurchaseStatusAsync(int purchaseId)
+        {
+            if (_dualWrite != null)
+            {
+                return await _dualWrite.ExecuteDualWriteAsync(async (context) =>
+                {
+                    var purchase = await context.InventoryPurchases
+                        .Include(p => p.InventoryItem)
+                        .FirstOrDefaultAsync(p => p.PurchaseID == purchaseId);
+
+                    if (purchase == null)
+                        return false;
+
+                    // Determine next status in cycle
+                    string nextStatus = purchase.PurchaseStatus switch
+                    {
+                        "PENDING" => "ORDERED",
+                        "ORDERED" => "FOR DELIVERY",
+                        "FOR DELIVERY" => "RECEIVED",
+                        _ => purchase.PurchaseStatus // No change if already RECEIVED or CANCELLED
+                    };
+
+                    if (nextStatus == purchase.PurchaseStatus)
+                        return false; // Already at final status
+
+                    // Update purchase status
+                    purchase.PurchaseStatus = nextStatus;
+                    
+                    // Set received date and update inventory stock when status becomes RECEIVED
+                    if (nextStatus == "RECEIVED")
+                    {
+                        purchase.ReceivedDate = DateTime.Now;
+                        
+                        // Update inventory stock only when received
+                        if (purchase.InventoryItem != null)
+                        {
+                            purchase.InventoryItem.CurrentStock = (purchase.InventoryItem.CurrentStock ?? 0) + purchase.Quantity;
+                        }
+                    }
+
+                    await context.SaveChangesAsync();
+                    return true;
+                }, "InventoryPurchase", null);
+            }
+            else
+            {
+                var purchase = await _context.InventoryPurchases
+                    .Include(p => p.InventoryItem)
+                    .FirstOrDefaultAsync(p => p.PurchaseID == purchaseId);
+
+                if (purchase == null)
+                    return false;
+
+                // Determine next status in cycle
+                string nextStatus = purchase.PurchaseStatus switch
+                {
+                    "PENDING" => "ORDERED",
+                    "ORDERED" => "FOR DELIVERY",
+                    "FOR DELIVERY" => "RECEIVED",
+                    _ => purchase.PurchaseStatus // No change if already RECEIVED or CANCELLED
+                };
+
+                if (nextStatus == purchase.PurchaseStatus)
+                    return false; // Already at final status
+
+                // Update purchase status
+                purchase.PurchaseStatus = nextStatus;
+                
+                // Set received date and update inventory stock when status becomes RECEIVED
+                if (nextStatus == "RECEIVED")
+                {
+                    purchase.ReceivedDate = DateTime.Now;
+                    
+                    // Update inventory stock only when received
+                    if (purchase.InventoryItem != null)
+                    {
+                        purchase.InventoryItem.CurrentStock = (purchase.InventoryItem.CurrentStock ?? 0) + purchase.Quantity;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                return true;
+            }
+        }
+
+        /// <summary>
         /// Marks a purchase as received and updates inventory stock.
         /// </summary>
         public async Task<bool> ReceivePurchaseAsync(int purchaseId)

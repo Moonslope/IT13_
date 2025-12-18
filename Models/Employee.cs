@@ -28,11 +28,29 @@ public partial class Employee
 
     public string Status { get; set; } = null!;
 
+    [NotMapped]
+    public decimal? HourlyRate { get; set; }
+
+    [NotMapped]
+    public decimal? BaseSalary { get; set; }
+
+    [NotMapped]
+    public string? SalaryType { get; set; } // Hourly, Monthly, Daily - Add to database when ready
+
     public virtual Position? Position { get; set; }
 
     public virtual ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 
     public virtual ICollection<SystemUser> SystemUsers { get; set; } = new List<SystemUser>();
+
+    // PayrollEntry table doesn't exist - marking as NotMapped
+    [NotMapped]
+    public virtual ICollection<PayrollEntry> PayrollEntries { get; set; } = new List<PayrollEntry>();
+
+    // EmployeeAttendance table doesn't exist - using Attendance table instead
+    // This property is kept for compatibility but marked as NotMapped to prevent EF Core from trying to map it
+    [NotMapped]
+    public virtual ICollection<EmployeeAttendance> EmployeeAttendances { get; set; } = new List<EmployeeAttendance>();
 
     // Alias for different naming conventions
     [NotMapped]
